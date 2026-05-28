@@ -1,0 +1,136 @@
+from __future__ import annotations
+
+import asyncio
+from collections.abc import AsyncIterator
+from typing import Literal
+from uuid import UUID
+
+from cominty_sdk._http import AsyncHTTPClient
+from cominty_sdk._qa import StreamEvent
+from cominty_sdk._streaming import stream_message_events
+from cominty_sdk.config import DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT
+from cominty_sdk.exceptions import ComintyTimeoutError
+from cominty_sdk.models.messages import (
+    ChatOptions,
+    ChatRequest,
+    HumanMessage,
+    MessageOut,
+    parse_message_response,
+)
+from cominty_sdk.resources.threads import ThreadsResource
+
+
+class MessagesResource:
+    """Message send, stream, cancel, export, and polling operations."""
+
+    def __init__(
+        self,
+        http: AsyncHTTPClient,
+        *,
+        default_agent_id: str | None,
+        threads: ThreadsResource,
+    ) -> None:
+        self._http = http
+        self._default_agent_id = default_agent_id
+        self._threads = threads
+
+    def _resolve_agent_id(self, agent_id: str | None) -> str:
+        resolved = agent_id or self._default_agent_id
+        if not resolved:
+            raise ValueError(
+                "agent_id is required. Pass it explicitly or set COMINTY_AGENT_ID."
+            )
+        return resolved
+
+    async def send(
+        self,
+        thread_id: str | UUID,
+        message: HumanMessage,
+        *,
+        agent_id: str | None = None,
+    ) -> MessageOut:
+        """Send a message in an existing thread."""
+        request = ChatRequest(
+            message=message,
+            options=ChatOptions(agent_id=self._resolve_agent_id(agent_id)),
+        )
+        data = await self._http.request(
+            "POST",
+            f"/chat/{thread_id}",
+            json=request.model_dump(exclude_none=True),
+        )
+        return parse_message_response(data)
+
+    async def send_and_wait(
+        self,
+        thread_id: str | UUID,
+        message: HumanMessage,
+        *,
+        agent_id: str | None = None,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
+        timeout: float = DEFAULT_POLL_TIMEOUT,
+    ) -> MessageOut:
+        """Send a message and poll until the agent response completes."""
+        sent = await self.send(thread_id, message, agent_id=agent_id)
+        return await self.wait_until_done(
+            sent.id,
+            thread_id=thread_id,
+            poll_interval=poll_interval,
+            timeout=timeout,
+        )
+
+    async def wait_until_done(
+        self,
+        message_id: str | UUID,
+        *,
+        thread_id: str | UUID,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
+        timeout: float = DEFAULT_POLL_TIMEOUT,
+    ) -> MessageOut:
+        """Poll the thread until the message reaches a terminal state."""
+        deadline = asyncio.get_running_loop().time() + timeout
+        message_uuid = UUID(str(message_id))
+        while True:
+            thread = await self._threads.get(thread_id)
+            for message in thread.messages:
+                if message.id == message_uuid:
+                    if message.is_terminal():
+                        return message
+                    break
+            if asyncio.get_running_loop().time() >= deadline:
+                raise ComintyTimeoutError(
+                    f"Timed out waiting for message {message_id} to complete."
+                )
+            await asyncio.sleep(poll_interval)
+
+    async def cancel(self, message_id: str | UUID) -> MessageOut:
+        return await self._http.request_model(
+            "POST",
+            f"/chat/messages/{message_id}/cancel",
+            MessageOut,
+        )
+
+    async def export(
+        self,
+        message_id: str | UUID,
+        *,
+        format: Literal["pdf", "docx"],
+    ) -> bytes:
+        return await self._http.request_bytes(
+            "GET",
+            f"/chat/messages/{message_id}/export",
+            params={"format": format},
+        )
+
+    def stream(
+        self,
+        message_id: str | UUID,
+        *,
+        last_event_id: str | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """Stream JSONL events for a message."""
+        return stream_message_events(
+            self._http,
+            str(message_id),
+            last_event_id=last_event_id,
+        )
