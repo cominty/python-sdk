@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
@@ -46,9 +46,3 @@ jobs:
 
       - name: Build
         run: uv build
-
-      - name: Publish to PyPI
-        run: uv publish
-        env:
-          UV_PUBLISH_USERNAME: __token__
-          UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}

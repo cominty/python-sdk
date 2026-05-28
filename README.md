@@ -134,30 +134,32 @@ COMINTY_API_KEY=... COMINTY_AGENT_ID=... uv run pytest -m integration
 
 ## Releasing
 
-### TestPyPI (`dev` branch)
+CI publishing to PyPI is **disabled for now** — pending Trusted Publishing (OIDC) setup.
 
-Every push to `dev` runs tests and publishes the current `pyproject.toml` version to [TestPyPI](https://test.pypi.org) using the `PYPI_TEST_API_TOKEN` GitHub secret.
+### Local development (current workflow)
 
-Bump the version before merging to `dev` (e.g. `0.2.0.dev1`) — TestPyPI rejects duplicate versions.
-
-Install from TestPyPI:
+Install in editable mode and run tests locally:
 
 ```bash
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ cominty-sdk
+uv sync --all-extras --dev
+uv run pytest
 ```
 
-### Production PyPI (semver tag)
+### Manual publish (when needed)
 
-1. Bump `version` in `pyproject.toml` (e.g. `0.2.0`)
-2. Commit and push to `main`
-3. Create and push a matching tag:
+```bash
+uv build
+uv publish --username __token__
+```
+
+### CI on release tags
+
+Pushing a semver tag (`v*`) runs tests, verifies the tag matches `pyproject.toml`, and builds the package — without publishing yet.
 
 ```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
-
-The `Release` workflow runs tests, verifies that the tag matches `pyproject.toml`, builds the package, and publishes to PyPI using the `PYPI_API_TOKEN` GitHub secret.
 
 ## License
 
