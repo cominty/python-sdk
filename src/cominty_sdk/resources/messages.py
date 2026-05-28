@@ -8,7 +8,7 @@ from uuid import UUID
 from cominty_sdk._http import AsyncHTTPClient
 from cominty_sdk._qa import StreamEvent
 from cominty_sdk._streaming import stream_message_events
-from cominty_sdk.config import DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT
+from cominty_sdk.config import DEFAULT_AGENT_ID, DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT
 from cominty_sdk.exceptions import ComintyTimeoutError
 from cominty_sdk.models.messages import (
     ChatOptions,
@@ -35,12 +35,7 @@ class MessagesResource:
         self._threads = threads
 
     def _resolve_agent_id(self, agent_id: str | None) -> str:
-        resolved = agent_id or self._default_agent_id
-        if not resolved:
-            raise ValueError(
-                "agent_id is required. Pass it explicitly or set COMINTY_AGENT_ID."
-            )
-        return resolved
+        return agent_id or self._default_agent_id or DEFAULT_AGENT_ID
 
     async def send(
         self,

@@ -6,7 +6,8 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel
 
-from cominty_sdk.config import AUTH_HEADER, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT
+from cominty_sdk._auth import build_auth_headers
+from cominty_sdk.config import DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT
 from cominty_sdk.exceptions import ComintyTimeoutError, raise_for_status
 from cominty_sdk.retry import compute_backoff, is_retryable_exception, maybe_raise_for_status
 
@@ -21,19 +22,21 @@ class AsyncHTTPClient:
         *,
         base_url: str,
         api_key: str,
+        org_id: str | None = None,
         max_retries: int = DEFAULT_MAX_RETRIES,
         timeout: float = DEFAULT_TIMEOUT,
         stream_timeout: float | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
+        self.org_id = org_id
         self.max_retries = max_retries
         self.timeout = timeout
         self.stream_timeout = stream_timeout or timeout
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=httpx.Timeout(timeout),
-            headers={AUTH_HEADER: api_key},
+            headers=build_auth_headers(api_key=api_key, org_id=org_id),
         )
 
     async def close(self) -> None:

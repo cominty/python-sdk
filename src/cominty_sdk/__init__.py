@@ -1,7 +1,7 @@
 """Cominty SDK — async Python client for the managed agent chat API."""
 
 from cominty_sdk.client import AsyncCominty
-from cominty_sdk.config import ComintyEnvironment
+from cominty_sdk.config import DEFAULT_AGENT_ID, DEFAULT_API_URL, ComintyEnvironment
 from cominty_sdk.exceptions import (
     AuthenticationError,
     ComintyAPIError,
@@ -29,6 +29,8 @@ __all__ = [
     "AuthenticationError",
     "ComintyAPIError",
     "ComintyEnvironment",
+    "DEFAULT_AGENT_ID",
+    "DEFAULT_API_URL",
     "ComintyError",
     "ComintyServerShuttingDownError",
     "ComintyTimeoutError",

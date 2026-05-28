@@ -23,20 +23,69 @@ uv add cominty-sdk
 
 | Variable | Description |
 |----------|-------------|
-| `COMINTY_API_KEY` | API key (required) |
-| `COMINTY_API_URL` | Override base URL (optional, takes priority) |
+| `COMINTY_API_KEY` | API access token from `POST /api-tokens` (required for chat) |
+| `COMINTY_SESSION_TOKEN` | Clerk session JWT for admin ops (`/api-tokens` management) |
+| `COMINTY_API_URL` | Override base URL (default: `https://ds.cominty.com`) |
 | `COMINTY_ENVIRONMENT` | `dev`, `staging`, or `production` (default: `production`) |
-| `COMINTY_AGENT_ID` | Default agent ID for chat operations |
+| `COMINTY_AGENT_ID` | Default agent pid (default: `__cominty_agents::agent.chat`) |
+| `COMINTY_USER_ID` | End-user identifier (required in API token mode, e.g. `user_123`) |
+| `COMINTY_ORG_ID` | Organization id header for Clerk session token requests |
 | `COMINTY_MAX_RETRIES` | Max retries on transient errors (default: `3`) |
 | `COMINTY_TIMEOUT` | Request timeout in seconds (default: `60`) |
 
-Default base URLs are placeholders and can be overridden with `COMINTY_API_URL`:
+Defaults (no env required):
+
+- API URL: `https://ds.cominty.com`
+- Agent ID: `__cominty_agents::agent.chat`
+
+Other environments via `COMINTY_ENVIRONMENT`:
 
 - `dev`: `https://api.dev.cominty.com`
 - `staging`: `https://api.staging.cominty.com`
-- `production`: `https://api.cominty.com`
+- `production`: `https://ds.cominty.com`
 
-Authentication uses the `x-cominty-token` header.
+## Authentication
+
+Cominty uses **two different credentials**:
+
+| Credential | Header | Used for |
+|------------|--------|----------|
+| **Clerk session token** | `Authorization: Bearer <jwt>` (+ optional `x-cmt-current-org-id`) | Admin: `POST/GET/DELETE /api-tokens` |
+| **API access token** | `x-cominty-token: Bearer <access_token>` | Chat SDK: `/chat`, files, usage |
+
+### 1. Create an API token (admin, one-time setup)
+
+Use a Clerk session token (from the Cominty portal, valid ~1 min) or ask an admin for a longer test token:
+
+```python
+async with AsyncCominty(
+    session_token="eyJ...",          # Clerk JWT
+    org_id="8",
+    base_url="https://ds.cominty.com",
+) as admin:
+    created = await admin.api_tokens.create("my-sdk-token")
+    print(created.access_token)  # save immediately
+```
+
+Or via curl:
+
+```bash
+curl -X POST "https://ds.cominty.com/api-tokens" \
+  -H "Authorization: Bearer $COMINTY_SESSION_TOKEN" \
+  -H "x-cmt-current-org-id: 8" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-sdk-token"}'
+```
+
+### 2. Use the API token for chat
+
+```bash
+export COMINTY_API_KEY="<access_token>"
+export COMINTY_USER_ID="user_123"
+# COMINTY_API_URL and COMINTY_AGENT_ID are optional (SDK defaults above)
+```
+
+In API token mode, `user_id` is **required** when starting a conversation.
 
 ## Quick start
 
@@ -50,7 +99,7 @@ async def main() -> None:
     async with AsyncCominty() as client:
         thread, reply = await client.chat.start_and_wait(
             HumanMessage(content="What is Cominty?"),
-            agent_id="your-agent-id",
+            user_id="user_123",
         )
         print(reply.content)
         print(reply.tool_names)

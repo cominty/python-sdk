@@ -9,8 +9,24 @@ from cominty_sdk.models.threads import ThreadOut, ThreadSummaryOut, ThreadUpdate
 class ThreadsResource:
     """Thread CRUD operations."""
 
-    def __init__(self, http: AsyncHTTPClient) -> None:
+    def __init__(
+        self,
+        http: AsyncHTTPClient,
+        *,
+        default_user_id: str | None = None,
+        api_mode: bool = False,
+    ) -> None:
         self._http = http
+        self._default_user_id = default_user_id
+        self._api_mode = api_mode
+
+    def _resolve_user_id(self, user_id: str | None) -> str | None:
+        resolved = user_id or self._default_user_id
+        if self._api_mode and not resolved:
+            raise ValueError(
+                "user_id is required in API mode. Pass user_id= or set COMINTY_USER_ID."
+            )
+        return resolved
 
     async def list(
         self,
@@ -21,8 +37,9 @@ class ThreadsResource:
         terms: list[str] | None = None,
     ) -> list[ThreadSummaryOut]:
         params: dict[str, object] = {"limit": limit, "page": page}
-        if user_id is not None:
-            params["user_id"] = user_id
+        resolved_user_id = self._resolve_user_id(user_id)
+        if resolved_user_id is not None:
+            params["user_id"] = resolved_user_id
         if terms is not None:
             params["terms"] = terms
         data = await self._http.request("GET", "/chat", params=params)

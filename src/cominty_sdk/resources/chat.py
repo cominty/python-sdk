@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from cominty_sdk._http import AsyncHTTPClient
-from cominty_sdk.config import DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT
+from cominty_sdk.config import DEFAULT_AGENT_ID, DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT
 from cominty_sdk.models.messages import HumanMessage, MessageOut, StartChatOptions, StartChatRequest
 from cominty_sdk.models.threads import ThreadOut
 from cominty_sdk.resources.messages import MessagesResource
@@ -16,19 +16,26 @@ class ChatResource:
         http: AsyncHTTPClient,
         *,
         default_agent_id: str | None,
+        default_user_id: str | None,
+        api_mode: bool,
         threads: ThreadsResource,
         messages: MessagesResource,
     ) -> None:
         self._http = http
         self._default_agent_id = default_agent_id
+        self._default_user_id = default_user_id
+        self._api_mode = api_mode
         self._threads = threads
         self._messages = messages
 
     def _resolve_agent_id(self, agent_id: str | None) -> str:
-        resolved = agent_id or self._default_agent_id
-        if not resolved:
+        return agent_id or self._default_agent_id or DEFAULT_AGENT_ID
+
+    def _resolve_user_id(self, user_id: str | None) -> str | None:
+        resolved = user_id or self._default_user_id
+        if self._api_mode and not resolved:
             raise ValueError(
-                "agent_id is required. Pass it explicitly or set COMINTY_AGENT_ID."
+                "user_id is required in API mode. Pass user_id= or set COMINTY_USER_ID."
             )
         return resolved
 
@@ -45,7 +52,7 @@ class ChatResource:
             message=message,
             options=StartChatOptions(
                 agent_id=self._resolve_agent_id(agent_id),
-                user_id=user_id,
+                user_id=self._resolve_user_id(user_id),
             ),
             name=name,
         )

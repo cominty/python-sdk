@@ -1,10 +1,13 @@
 from enum import StrEnum
 from typing import Literal
 
+DEFAULT_API_URL = "https://ds.cominty.com"
+DEFAULT_AGENT_ID = "__cominty_agents::agent.chat"
+
 DEFAULT_BASE_URLS: dict[str, str] = {
     "dev": "https://api.dev.cominty.com",
     "staging": "https://api.staging.cominty.com",
-    "production": "https://api.cominty.com",
+    "production": DEFAULT_API_URL,
 }
 
 
@@ -27,3 +30,4 @@ NON_TERMINAL_STATUSES = frozenset({"pending", "running", "in_progress", "process
 
 # Header used for API key authentication.
 AUTH_HEADER = "x-cominty-token"
+ORG_ID_HEADER = "x-cmt-current-org-id"
