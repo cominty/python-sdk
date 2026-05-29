@@ -91,6 +91,27 @@ def test_human_message_disabled_tools_validation() -> None:
         HumanMessage(content="hello", disabled_tools=["invalid_tool"])
 
 
+def test_is_stream_terminal_event() -> None:
+    from cominty_sdk._qa import extract_stream_reply, is_stream_terminal_event
+
+    assert is_stream_terminal_event({"type": "done"}) is True
+    assert is_stream_terminal_event({"type": "delta", "content": "x"}) is False
+    assert is_stream_terminal_event(
+        {"name": "result", "status": "success", "data": {"reply": "OK"}}
+    ) is True
+    assert is_stream_terminal_event(
+        {
+            "role": "assistant",
+            "content": "SDK endpoint test OK",
+            "live": False,
+            "status": "success",
+        }
+    ) is True
+    assert extract_stream_reply(
+        {"name": "result", "status": "success", "data": {"reply": "OK"}}
+    ) == "OK"
+
+
 def test_extract_tool_names() -> None:
     events = [
         {"type": "tool_call", "tool_name": "company_documents"},
@@ -200,11 +221,10 @@ async def test_jsonl_streaming(http_client: AsyncHTTPClient) -> None:
         return_value=httpx.Response(200, content=body)
     )
 
-    response = await http_client.stream_request(
+    async with http_client.stream_context(
         "GET",
         f"/chat/messages/{message_id}/stream",
-    )
-    events = [event async for event in iter_jsonl_events(response)]
-    await response.aclose()
+    ) as response:
+        events = [event async for event in iter_jsonl_events(response)]
     assert events[0]["type"] == "delta"
     assert events[1]["type"] == "done"

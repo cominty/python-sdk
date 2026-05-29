@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any, TypeVar
 
 import httpx
@@ -139,32 +141,42 @@ class AsyncHTTPClient:
         assert last_exc is not None
         raise last_exc
 
-    async def stream_request(
+    @asynccontextmanager
+    async def stream_context(
         self,
         method: str,
         path: str,
         *,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-    ) -> httpx.Response:
-        """Open a streaming HTTP response (caller must close context)."""
-        response = await self._client.stream(
+    ) -> AsyncIterator[httpx.Response]:
+        """Open a streaming HTTP response (use as async context manager)."""
+        request_headers = dict(headers or {})
+        request_headers.setdefault("Accept", "application/jsonl, application/x-ndjson")
+        # No read timeout: the caller enforces its own deadline while waiting for events.
+        timeout = httpx.Timeout(
+            connect=self.timeout,
+            read=None,
+            write=self.timeout,
+            pool=self.timeout,
+        )
+        async with self._client.stream(
             method,
             path,
             params=params,
-            headers=headers,
-            timeout=httpx.Timeout(self.stream_timeout),
-        ).__aenter__()
-        if response.status_code >= 400:
-            await response.aread()
-            body: Any = None
-            if response.content:
-                try:
-                    body = response.json()
-                except Exception:
-                    body = response.text
-            raise_for_status(response.status_code, body, f"{method} {path} failed")
-        return response
+            headers=request_headers,
+            timeout=timeout,
+        ) as response:
+            if response.status_code >= 400:
+                await response.aread()
+                body: Any = None
+                if response.content:
+                    try:
+                        body = response.json()
+                    except Exception:
+                        body = response.text
+                raise_for_status(response.status_code, body, f"{method} {path} failed")
+            yield response
 
     @property
     def raw_client(self) -> httpx.AsyncClient:

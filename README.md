@@ -138,7 +138,19 @@ await client.messages.send_and_wait(
 
 ## Streaming
 
-The API returns JSONL events on the stream endpoint:
+The API returns JSONL events on the stream endpoint. Terminal events include
+`name: "result", status: "success"` or a final assistant snapshot with `live: false`.
+
+By default, `wait_until_done` and `start_and_wait` consume the stream first, then
+fall back to polling `GET /chat/{thread_id}` if needed. Disable streaming:
+
+```python
+reply = await client.messages.wait_until_done(
+    message.id,
+    thread_id=thread.id,
+    prefer_stream=False,
+)
+```
 
 ```python
 async for event in client.messages.stream(message.id):

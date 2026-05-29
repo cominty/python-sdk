@@ -82,9 +82,9 @@ class ChatResource:
         )
         if not thread.messages:
             raise ValueError("Thread returned without messages.")
-        last_message = thread.messages[-1]
+        assistant = MessagesResource.find_assistant_message(thread)
         completed = await self._messages.wait_until_done(
-            last_message.id,
+            assistant.id,
             thread_id=thread.id,
             poll_interval=poll_interval,
             timeout=timeout,

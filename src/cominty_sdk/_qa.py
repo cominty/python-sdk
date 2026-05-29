@@ -9,11 +9,45 @@ import httpx
 
 StreamEvent = dict[str, Any]
 
+STREAM_TERMINAL_EVENT_TYPES = frozenset({"done", "completed", "error", "cancelled"})
+
 DOCUMENT_CITE_PATTERN = re.compile(
     r'<cite\s+document_id="([^"]+)"\s+pages="([^"]+)"\s+name="([^"]+)"\s*/>',
 )
 WEB_CITE_PATTERN = re.compile(r'<cite\s+url="(https?://[^"]+)"\s*/>')
 CITE_TAG_PATTERN = re.compile(r"<cite[^>]*/>")
+
+
+def is_stream_terminal_event(event: StreamEvent) -> bool:
+    """Return True when a JSONL stream event signals the message has finished."""
+    event_type = event.get("type") or event.get("event")
+    if isinstance(event_type, str) and event_type.lower() in STREAM_TERMINAL_EVENT_TYPES:
+        return True
+
+    name = event.get("name")
+    status = event.get("status")
+    if name == "result" and status == "success":
+        return True
+
+    if event.get("role") == "assistant" and event.get("live") is False:
+        terminal_status = str(status or "").lower()
+        return terminal_status in {"success", "completed", "error", "cancelled"}
+
+    return False
+
+
+def extract_stream_reply(event: StreamEvent) -> str | None:
+    """Extract assistant reply text from a terminal stream event, if present."""
+    if event.get("name") == "result" and event.get("status") == "success":
+        data = event.get("data")
+        if isinstance(data, dict):
+            reply = data.get("reply")
+            if isinstance(reply, str):
+                return reply
+    content = event.get("content")
+    if event.get("role") == "assistant" and isinstance(content, str):
+        return content
+    return None
 
 
 def extract_tool_names(events: list[dict[str, Any]] | None) -> list[str]:
@@ -67,8 +101,14 @@ def parse_web_citations(content: str) -> list[dict[str, str]]:
 
 async def iter_jsonl_events(response: httpx.Response) -> AsyncIterator[StreamEvent]:
     """Parse a JSONL stream into async event dicts."""
-    async for line in response.aiter_lines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        yield json.loads(stripped)
+    try:
+        async for line in response.aiter_lines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            yield json.loads(stripped)
+    except httpx.StreamClosed:
+        return
+    except httpx.ReadError:
+        # Server closed the connection before any JSONL (common when agent is still pending).
+        return
