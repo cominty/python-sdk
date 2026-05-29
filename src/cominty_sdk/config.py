@@ -28,6 +28,8 @@ DEFAULT_POLL_TIMEOUT = 120.0
 # Message statuses that indicate the agent is still processing.
 NON_TERMINAL_STATUSES = frozenset({"pending", "running", "in_progress", "processing"})
 
+TERMINAL_STATUSES = frozenset({"success", "completed", "error", "cancelled", "failed"})
+
 # Header used for API key authentication.
 AUTH_HEADER = "x-cominty-token"
 ORG_ID_HEADER = "x-cmt-current-org-id"

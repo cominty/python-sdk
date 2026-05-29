@@ -121,6 +121,26 @@ def test_extract_tool_names() -> None:
     assert extract_tool_names(events) == ["company_documents", "web"]
 
 
+def test_extract_tool_names_from_cominty_tool_call_events() -> None:
+    events = [
+        {
+            "name": "tool_call",
+            "status": "success",
+            "data": {"name": "company_doc_content_search", "description": "Find policy"},
+        },
+        {
+            "name": "tool_call",
+            "status": "success",
+            "data": {"name": "company_doc_find_by_name", "description": "Find docs"},
+        },
+        {"name": "llm", "status": "success", "data": {"model": "Claude Haiku 4.5 (latest)"}},
+    ]
+    assert extract_tool_names(events) == [
+        "company_doc_content_search",
+        "company_doc_find_by_name",
+    ]
+
+
 def test_citation_parsing() -> None:
     content = (
         'Answer <cite document_id="doc-1" pages="1-2" name="Report"/> '
@@ -150,6 +170,25 @@ def test_message_out_qa_accessors() -> None:
     )
     assert message.tool_names == ["web"]
     assert len(message.document_citations) == 1
+    assert message.is_terminal()
+
+
+# Terminal success statuses are enough even when live=true on the API side.
+def test_message_terminal_on_success_status() -> None:
+    message = MessageOut.model_validate(
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "thread_id": "550e8400-e29b-41d4-a716-446655440001",
+            "role": "assistant",
+            "content": "done",
+            "questions": None,
+            "live": True,
+            "status": "success",
+            "events": [],
+            "structured_output": None,
+            "files": [],
+        }
+    )
     assert message.is_terminal()
 
 

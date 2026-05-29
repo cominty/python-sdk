@@ -8,7 +8,7 @@ from uuid import UUID
 from cominty_sdk._http import AsyncHTTPClient
 from cominty_sdk._qa import StreamEvent, is_stream_terminal_event
 from cominty_sdk._streaming import stream_message_events
-from cominty_sdk.config import DEFAULT_AGENT_ID, DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT
+from cominty_sdk.config import DEFAULT_AGENT_ID, DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT, TERMINAL_STATUSES
 from cominty_sdk.exceptions import ComintyError, ComintyTimeoutError
 from cominty_sdk.models.messages import (
     ChatOptions,
@@ -125,19 +125,44 @@ class MessagesResource:
         """Consume GET /chat/messages/{id}/stream until a terminal JSONL event."""
         deadline = asyncio.get_running_loop().time() + timeout
         saw_terminal = False
-        async for event in self.stream(message_id):
-            if is_stream_terminal_event(event):
-                saw_terminal = True
-                break
-            if asyncio.get_running_loop().time() >= deadline:
-                raise ComintyTimeoutError(
-                    f"Timed out waiting for message {message_id} stream to complete."
-                )
-        if not saw_terminal:
+        event_count = 0
+        try:
+            async for event in self.stream(message_id):
+                event_count += 1
+                if is_stream_terminal_event(event):
+                    saw_terminal = True
+                    break
+                if asyncio.get_running_loop().time() >= deadline:
+                    raise ComintyTimeoutError(
+                        f"Timed out waiting for message {message_id} stream to complete."
+                    )
+        except ComintyTimeoutError:
+            raise
+        except Exception:
+            pass
+
+        message = await self._get_message_from_thread(message_id, thread_id=thread_id)
+        thread = await self._threads.get(thread_id)
+        if saw_terminal or event_count > 0:
+            if self._is_message_complete(message, thread_live=thread.live):
+                return message
+        if saw_terminal:
+            return message
+        if event_count == 0:
             raise ComintyError(
-                f"Stream ended without a terminal event for message {message_id}."
+                f"Stream ended without events for message {message_id}."
             )
-        return await self._get_message_from_thread(message_id, thread_id=thread_id)
+        raise ComintyError(
+            f"Stream ended without a terminal event for message {message_id}."
+        )
+
+    @staticmethod
+    def _is_message_complete(message: MessageOut, *, thread_live: bool) -> bool:
+        if message.is_terminal():
+            return True
+        if not thread_live and message.status.lower() in TERMINAL_STATUSES:
+            return True
+        return not thread_live and message.status.lower() not in {"pending", "running", "in_progress", "processing"}
 
     async def _wait_until_done_via_poll(
         self,
@@ -151,8 +176,12 @@ class MessagesResource:
         deadline = asyncio.get_running_loop().time() + timeout
         message_uuid = UUID(str(message_id))
         while True:
+            thread = await self._threads.get(thread_id)
             message = await self._get_message_from_thread(message_id, thread_id=thread_id)
-            if message.id == message_uuid and message.is_terminal():
+            if message.id == message_uuid and self._is_message_complete(
+                message,
+                thread_live=thread.live,
+            ):
                 return message
             if asyncio.get_running_loop().time() >= deadline:
                 raise ComintyTimeoutError(

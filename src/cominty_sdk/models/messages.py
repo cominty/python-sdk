@@ -96,9 +96,12 @@ class MessageOut(BaseModel):
 
     def is_terminal(self) -> bool:
         """Return True when the message has finished processing."""
-        from cominty_sdk.config import NON_TERMINAL_STATUSES
+        from cominty_sdk.config import NON_TERMINAL_STATUSES, TERMINAL_STATUSES
 
-        return not self.live and self.status.lower() not in NON_TERMINAL_STATUSES
+        status = self.status.lower()
+        if status in TERMINAL_STATUSES:
+            return True
+        return not self.live and status not in NON_TERMINAL_STATUSES
 
 
 class ChatOptions(BaseModel):

@@ -64,20 +64,36 @@ def extract_tool_names(events: list[dict[str, Any]] | None) -> list[str]:
     return names
 
 
+GENERIC_EVENT_NAMES = frozenset(
+    {
+        "tool_call",
+        "tool_use",
+        "tool",
+        "llm",
+        "intermediary_update",
+        "setting_up_sandbox",
+        "result",
+    }
+)
+
+
 def _extract_tool_name_from_event(event: dict[str, Any]) -> str | None:
-    for key in ("tool_name", "tool", "name"):
+    data = event.get("data")
+    if isinstance(data, dict):
+        for key in ("tool_name", "tool", "name"):
+            value = data.get(key)
+            if isinstance(value, str) and value and value not in GENERIC_EVENT_NAMES:
+                return value
+
+    for key in ("tool_name", "tool"):
         value = event.get(key)
         if isinstance(value, str) and value:
             return value
-    event_type = event.get("type") or event.get("event")
-    if event_type in ("tool_call", "tool_use", "tool"):
-        for key in ("tool_name", "tool", "name"):
-            value = event.get(key)
-            if isinstance(value, str) and value:
-                return value
-    data = event.get("data")
-    if isinstance(data, dict):
-        return _extract_tool_name_from_event(data)
+
+    name = event.get("name")
+    if isinstance(name, str) and name and name not in GENERIC_EVENT_NAMES:
+        return name
+
     return None
 
 
