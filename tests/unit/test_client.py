@@ -267,3 +267,47 @@ async def test_jsonl_streaming(http_client: AsyncHTTPClient) -> None:
         events = [event async for event in iter_jsonl_events(response)]
     assert events[0]["type"] == "delta"
     assert events[1]["type"] == "done"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_jsonl_streaming_concatenated_objects(http_client: AsyncHTTPClient) -> None:
+    from cominty_sdk._qa import iter_jsonl_events
+
+    message_id = "550e8400-e29b-41d4-a716-446655440001"
+    body = (
+        b'{"name":"llm","status":"running"}'
+        b'{"name":"result","status":"success","data":{"reply":"Done"}}'
+    )
+    respx.get(f"https://api.test.cominty.com/chat/messages/{message_id}/stream").mock(
+        return_value=httpx.Response(200, content=body)
+    )
+
+    async with http_client.stream_context(
+        "GET",
+        f"/chat/messages/{message_id}/stream",
+    ) as response:
+        events = [event async for event in iter_jsonl_events(response)]
+    assert events[0]["name"] == "llm"
+    assert events[1]["name"] == "result"
+    assert events[1]["data"]["reply"] == "Done"
+
+
+def test_message_from_stream_terminal_result() -> None:
+    from cominty_sdk._qa import message_from_stream_terminal
+
+    message_id = "550e8400-e29b-41d4-a716-446655440000"
+    thread_id = "550e8400-e29b-41d4-a716-446655440001"
+    payload = message_from_stream_terminal(
+        {
+            "name": "result",
+            "status": "success",
+            "data": {"reply": "Hello from stream"},
+        },
+        fallback_message_id=message_id,
+        fallback_thread_id=thread_id,
+    )
+    assert payload is not None
+    assert payload["content"] == "Hello from stream"
+    assert payload["status"] == "success"
+    assert payload["live"] is False

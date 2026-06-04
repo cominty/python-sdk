@@ -50,6 +50,89 @@ def extract_stream_reply(event: StreamEvent) -> str | None:
     return None
 
 
+def stream_event_id(event: StreamEvent) -> str | None:
+    """Return the stream cursor id for last-event-id resumption."""
+    value = event.get("id")
+    return value if isinstance(value, str) and value else None
+
+
+def message_from_stream_terminal(
+    event: StreamEvent,
+    *,
+    fallback_message_id: str,
+    fallback_thread_id: str,
+) -> dict[str, Any] | None:
+    """Build a MessageOut-compatible dict from a terminal stream event."""
+    from uuid import UUID
+
+    if event.get("role") == "assistant":
+        payload = dict(event)
+        payload.setdefault("id", fallback_message_id)
+        payload.setdefault("thread_id", fallback_thread_id)
+        payload.setdefault("live", False)
+        payload.setdefault("status", "success")
+        payload.setdefault("content", payload.get("content") or "")
+        payload.setdefault("questions", payload.get("questions") or [])
+        payload.setdefault("files", payload.get("files") or [])
+        return payload
+
+    if event.get("name") == "result" and event.get("status") == "success":
+        reply = extract_stream_reply(event) or ""
+        data = event.get("data")
+        files: list[Any] = []
+        questions: list[Any] = []
+        if isinstance(data, dict):
+            raw_files = data.get("files")
+            if isinstance(raw_files, list):
+                files = raw_files
+            raw_questions = data.get("questions")
+            if isinstance(raw_questions, list):
+                questions = raw_questions
+        return {
+            "id": str(UUID(str(fallback_message_id))),
+            "thread_id": str(UUID(str(fallback_thread_id))),
+            "role": "assistant",
+            "content": reply,
+            "questions": questions or None,
+            "live": False,
+            "status": "success",
+            "events": None,
+            "structured_output": None,
+            "files": files,
+        }
+
+    return None
+
+
+def _yield_decoded_json_objects(buffer: str) -> tuple[list[StreamEvent], str]:
+    """Decode one or more JSON values from a buffer (newline optional)."""
+    decoder = json.JSONDecoder()
+    events: list[StreamEvent] = []
+    index = 0
+    length = len(buffer)
+    while index < length:
+        while index < length and buffer[index].isspace():
+            index += 1
+        if index >= length:
+            break
+        if buffer.startswith("data:", index):
+            line_end = buffer.find("\n", index)
+            if line_end == -1:
+                break
+            payload = buffer[index + 5 : line_end].strip()
+            index = line_end + 1
+            if payload:
+                events.append(json.loads(payload))
+            continue
+        try:
+            event, offset = decoder.raw_decode(buffer, index)
+        except json.JSONDecodeError:
+            break
+        events.append(event)
+        index += offset
+    return events, buffer[index:]
+
+
 def extract_tool_names(events: list[dict[str, Any]] | None) -> list[str]:
     """Extract tool names from message events, deduplicated preserving order."""
     if not events:
@@ -116,15 +199,27 @@ def parse_web_citations(content: str) -> list[dict[str, str]]:
 
 
 async def iter_jsonl_events(response: httpx.Response) -> AsyncIterator[StreamEvent]:
-    """Parse a JSONL stream into async event dicts."""
+    """Parse JSONL/NDJSON stream chunks, including multiple objects per line."""
+    buffer = ""
     try:
-        async for line in response.aiter_lines():
-            stripped = line.strip()
-            if not stripped:
-                continue
-            yield json.loads(stripped)
+        async for chunk in response.aiter_text():
+            buffer += chunk
+            events, buffer = _yield_decoded_json_objects(buffer)
+            for event in events:
+                yield event
+        if buffer.strip():
+            events, _ = _yield_decoded_json_objects(buffer)
+            for event in events:
+                yield event
     except httpx.StreamClosed:
+        if buffer.strip():
+            events, _ = _yield_decoded_json_objects(buffer)
+            for event in events:
+                yield event
         return
     except httpx.ReadError:
-        # Server closed the connection before any JSONL (common when agent is still pending).
+        if buffer.strip():
+            events, _ = _yield_decoded_json_objects(buffer)
+            for event in events:
+                yield event
         return
