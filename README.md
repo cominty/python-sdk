@@ -1,5 +1,10 @@
 # Cominty Python SDK
 
+[![PyPI](https://img.shields.io/pypi/v/cominty-sdk.svg)](https://pypi.org/project/cominty-sdk/)
+[![Python versions](https://img.shields.io/pypi/pyversions/cominty-sdk.svg)](https://pypi.org/project/cominty-sdk/)
+[![CI](https://github.com/cominty/python-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/cominty/python-sdk/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Official async Python client for the Cominty managed agent chat API.
 
 ## Requirements
@@ -42,6 +47,18 @@ uv add cominty-sdk
 
 > Configuration resolution order for every option: **explicit argument** →
 > **environment variable** (incl. `.env`) → **built-in default**.
+
+`.env` is **optional** — it's a dev convenience. You can configure everything in
+code (handy when secrets come from a vault or your app's own env), and the SDK
+also reads real OS environment variables directly:
+
+```python
+client = AsyncCominty(
+    api_key="ak_...",       # explicit args win over env / .env
+    user_id="user_123",
+    environment="production",
+)
+```
 
 ## Configuration
 

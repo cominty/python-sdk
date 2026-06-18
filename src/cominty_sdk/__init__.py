@@ -1,5 +1,7 @@
 """Cominty SDK — async Python client for the managed agent chat API."""
 
+from importlib.metadata import PackageNotFoundError, version
+
 from cominty_sdk.client import AsyncCominty
 from cominty_sdk.config import DEFAULT_AGENT_ID, DEFAULT_API_URL, ComintyEnvironment
 from cominty_sdk.exceptions import (
@@ -52,4 +54,7 @@ __all__ = [
     "WebCitation",
 ]
 
-__version__ = "0.1.0"
+try:
+    __version__ = version("cominty-sdk")
+except PackageNotFoundError:  # running from a source tree without an install
+    __version__ = "0.0.0+unknown"
