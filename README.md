@@ -19,6 +19,30 @@ Or with [uv](https://docs.astral.sh/uv/):
 uv add cominty-sdk
 ```
 
+## Quick setup (3 steps)
+
+1. **Install** — `pip install cominty-sdk` (or `uv add cominty-sdk`).
+2. **Create a `.env`** — copy the template and fill in your API token:
+
+   ```bash
+   cp .env.example .env   # then edit COMINTY_API_KEY and COMINTY_USER_ID
+   ```
+
+   The SDK **loads `.env` automatically** (via `pydantic-settings`) — you don't
+   need `python-dotenv` or to export anything. A minimal `.env`:
+
+   ```dotenv
+   COMINTY_API_KEY=<access_token from POST /api-tokens>
+   COMINTY_USER_ID=user_123
+   # COMINTY_ENVIRONMENT=production   # dev | staging | production (default)
+   ```
+
+   Don't have a token yet? See [Authentication](#authentication) below.
+3. **Run** — see [Quick start](#quick-start).
+
+> Configuration resolution order for every option: **explicit argument** →
+> **environment variable** (incl. `.env`) → **built-in default**.
+
 ## Configuration
 
 | Variable | Description |
@@ -40,7 +64,7 @@ Defaults (no env required):
 
 Other environments via `COMINTY_ENVIRONMENT`:
 
-- `dev`: `https://api.dev.cominty.com`
+- `dev`: `https://ds-dev.cominty.com`
 - `staging`: `https://api.staging.cominty.com`
 - `production`: `https://ds.cominty.com`
 
@@ -176,7 +200,29 @@ reply.web_citations        # parsed web citations
 | Chat | `start`, `start_and_wait` |
 | Messages | `send`, `send_and_wait`, `wait_until_done`, `cancel`, `export`, `stream` |
 | Files | `upload`, `download` |
-| Usage | `get` |
+| Usage | `get` (requires a Clerk session token, not an API token) |
+| Agents | `list` (requires a Clerk session token) |
+
+### List agents (benchmark / agent selection)
+
+`GET /agents` returns org-managed agents (`id`, `name`, `mode`, …). Use `agent_id` in chat options — not a raw LLM model slug.
+
+```python
+async with AsyncCominty() as client:
+    agents = await client.agents.list()
+    for agent in agents:
+        print(agent.name, agent.id, agent.mode)
+```
+
+`GET /agents` uses the **Clerk session JWT** (`COMINTY_SESSION_TOKEN`), not the chat API access token.
+Match the API environment to your Clerk issuer (dev JWT → `COMINTY_ENVIRONMENT=dev`).
+The SDK auto-fills `COMINTY_ORG_ID` / `COMINTY_USER_ID` from the JWT when omitted.
+
+```bash
+export COMINTY_SESSION_TOKEN="<JWT from browser DevTools>"
+export COMINTY_ENVIRONMENT=dev
+uv run python scripts/list_agents.py
+```
 
 ## Development
 
@@ -195,31 +241,54 @@ COMINTY_API_KEY=... COMINTY_AGENT_ID=... uv run pytest -m integration
 
 ## Releasing
 
-CI publishing to PyPI is **disabled for now** — pending Trusted Publishing (OIDC) setup.
+Publishing is **tag-driven** and uses **PyPI Trusted Publishing (OIDC)** — no API
+tokens are stored in GitHub. The workflow lives in `.github/workflows/release.yml`.
 
-### Local development (current workflow)
+### How a tag maps to a registry
 
-Install in editable mode and run tests locally:
+| Tag example | Publishes to |
+|-------------|--------------|
+| `v0.2.0rc1`, `v0.2.0a1`, `v0.2.0b1`, `v0.2.0.dev1` (pre-release) | **TestPyPI** only |
+| `v0.2.0` (final semver) | **TestPyPI**, then **PyPI** |
+
+On any `v*` tag the workflow runs the test matrix, verifies the tag matches the
+`version` in `pyproject.toml`, builds the sdist + wheel, and publishes. Final
+releases go through TestPyPI first, then PyPI.
+
+### Cutting a release
 
 ```bash
-uv sync --all-extras --dev
-uv run pytest
+# 1. Bump the version in pyproject.toml (e.g. 0.1.0 -> 0.2.0)
+
+# 2. (optional) dry-run to TestPyPI with a pre-release tag
+git tag v0.2.0rc1 && git push origin v0.2.0rc1
+#    verify: pip install -i https://test.pypi.org/simple/ cominty-sdk==0.2.0rc1
+
+# 3. ship to PyPI with the final tag
+git tag v0.2.0 && git push origin v0.2.0
 ```
 
-### Manual publish (when needed)
+### One-time setup (required before the first publish)
+
+Trusted Publishing must be registered on **both** registries — once each:
+
+1. **TestPyPI** → https://test.pypi.org/manage/account/publishing/ → add a
+   pending publisher:
+   - Project: `cominty-sdk` · Owner: `cominty` · Repo: `python-sdk`
+   - Workflow: `release.yml` · Environment: `testpypi`
+2. **PyPI** → https://pypi.org/manage/account/publishing/ → same, with
+   Environment: `pypi`.
+3. (recommended) In GitHub repo **Settings → Environments**, add required
+   reviewers to the `pypi` environment so production publishes need an approval.
+
+No secrets to configure — OIDC handles auth.
+
+### Manual publish (fallback)
 
 ```bash
 uv build
-uv publish --username __token__
-```
-
-### CI on release tags
-
-Pushing a semver tag (`v*`) runs tests, verifies the tag matches `pyproject.toml`, and builds the package — without publishing yet.
-
-```bash
-git tag v0.2.0
-git push origin v0.2.0
+uv publish --token <pypi-token>          # PyPI
+uv publish --token <testpypi-token> --publish-url https://test.pypi.org/legacy/
 ```
 
 ## License

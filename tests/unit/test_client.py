@@ -293,6 +293,65 @@ async def test_jsonl_streaming_concatenated_objects(http_client: AsyncHTTPClient
     assert events[1]["data"]["reply"] == "Done"
 
 
+@respx.mock
+@pytest.mark.asyncio
+async def test_agents_list(http_client: AsyncHTTPClient) -> None:
+    from cominty_sdk.resources.agents import AgentsResource
+
+    payload = [
+        {
+            "id": "__cominty_agents::agent.chat",
+            "name": "Default Chat",
+            "mode": "lite",
+            "description": "Main agent",
+            "instructions": None,
+            "owner": "org_abc",
+        },
+    ]
+    respx.get("https://api.test.cominty.com/agents").mock(
+        return_value=httpx.Response(200, json=payload),
+    )
+    agents = await AgentsResource(http_client).list()
+    assert len(agents) == 1
+    assert agents[0].id == "__cominty_agents::agent.chat"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_agents_list_falls_back_to_admin_http() -> None:
+    from cominty_sdk.resources.agents import AgentsResource
+
+    chat_http = AsyncHTTPClient(
+        base_url="https://api.test.cominty.com",
+        api_key="chat-token",
+    )
+    admin_http = AsyncHTTPClient(
+        base_url="https://api.test.cominty.com",
+        api_key="admin-jwt",
+    )
+    respx.get("https://api.test.cominty.com/agents").mock(
+        side_effect=[
+            httpx.Response(403, json={"detail": "Forbidden"}),
+            httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": "agent-1",
+                        "name": "Admin listed",
+                        "mode": "hive",
+                        "description": None,
+                        "instructions": None,
+                        "owner": "org",
+                    }
+                ],
+            ),
+        ]
+    )
+    agents = await AgentsResource(chat_http, admin_http=admin_http).list()
+    assert len(agents) == 1
+    assert agents[0].name == "Admin listed"
+
+
 def test_message_from_stream_terminal_result() -> None:
     from cominty_sdk._qa import message_from_stream_terminal
 

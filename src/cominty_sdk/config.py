@@ -5,7 +5,7 @@ DEFAULT_API_URL = "https://ds.cominty.com"
 DEFAULT_AGENT_ID = "__cominty_agents::agent.chat"
 
 DEFAULT_BASE_URLS: dict[str, str] = {
-    "dev": "https://api.dev.cominty.com",
+    "dev": "https://ds-dev.cominty.com",
     "staging": "https://api.staging.cominty.com",
     "production": DEFAULT_API_URL,
 }

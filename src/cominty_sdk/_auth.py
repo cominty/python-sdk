@@ -1,3 +1,7 @@
+import base64
+import json
+from typing import Any
+
 API_TOKEN_HEADER = "x-cominty-token"
 ORG_ID_HEADER = "x-cmt-current-org-id"
 
@@ -26,6 +30,45 @@ def is_clerk_session_jwt(token: str) -> bool:
 def is_api_access_token(token: str) -> bool:
     """Return True for API access tokens created via POST /api-tokens."""
     return not is_clerk_session_jwt(token)
+
+
+def decode_jwt_payload_unverified(token: str) -> dict[str, Any]:
+    """Decode JWT payload without signature verification (diagnostics only)."""
+    parts = strip_bearer_prefix(token).split(".")
+    if len(parts) != 3:
+        return {}
+    segment = parts[1]
+    padded = segment + "=" * (-len(segment) % 4)
+    try:
+        raw = base64.urlsafe_b64decode(padded.encode("ascii"))
+        data = json.loads(raw.decode("utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+
+
+def clerk_jwt_org_id(token: str) -> str | None:
+    """Best-effort org id from a Clerk session JWT payload."""
+    payload = decode_jwt_payload_unverified(token)
+    for key in ("current_organization_id", "org_id"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    org = payload.get("o")
+    if isinstance(org, dict):
+        org_id = org.get("id")
+        if isinstance(org_id, str) and org_id.strip():
+            return org_id.strip()
+    return None
+
+
+def clerk_jwt_user_id(token: str) -> str | None:
+    payload = decode_jwt_payload_unverified(token)
+    for key in ("user_id", "sub"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.startswith("user_"):
+            return value.strip()
+    return None
 
 
 def build_auth_headers(*, api_key: str, org_id: str | None = None) -> dict[str, str]:

@@ -5,7 +5,12 @@ from typing import Self
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from cominty_sdk._auth import is_api_access_token
+from cominty_sdk._auth import (
+    clerk_jwt_org_id,
+    clerk_jwt_user_id,
+    is_api_access_token,
+    is_clerk_session_jwt,
+)
 from cominty_sdk._http import AsyncHTTPClient
 from cominty_sdk.config import (
     DEFAULT_AGENT_ID,
@@ -15,6 +20,7 @@ from cominty_sdk.config import (
     ComintyEnvironment,
 )
 from cominty_sdk.exceptions import resolve_base_url
+from cominty_sdk.resources.agents import AgentsResource
 from cominty_sdk.resources.api_tokens import ApiTokensResource
 from cominty_sdk.resources.chat import ChatResource
 from cominty_sdk.resources.files import FilesResource
@@ -81,6 +87,16 @@ class AsyncCominty:
         )
         resolved_user_id = user_id or settings.user_id or os.environ.get("COMINTY_USER_ID")
         resolved_org_id = org_id or settings.org_id or os.environ.get("COMINTY_ORG_ID")
+        if (
+            not resolved_org_id
+            and resolved_session_token
+            and is_clerk_session_jwt(resolved_session_token)
+        ):
+            resolved_org_id = clerk_jwt_org_id(resolved_session_token)
+        if not resolved_user_id and resolved_session_token and is_clerk_session_jwt(
+            resolved_session_token
+        ):
+            resolved_user_id = clerk_jwt_user_id(resolved_session_token)
         if max_retries != DEFAULT_MAX_RETRIES:
             resolved_max_retries = max_retries
         else:
@@ -92,6 +108,21 @@ class AsyncCominty:
             else settings.stream_timeout
         )
         api_mode = bool(resolved_api_key and is_api_access_token(resolved_api_key))
+        self.base_url = resolved_base_url
+
+        self.api_tokens: ApiTokensResource | None = None
+        self._admin_http: AsyncHTTPClient | None = None
+        if resolved_session_token:
+            admin_http = AsyncHTTPClient(
+                base_url=resolved_base_url,
+                api_key=resolved_session_token,
+                org_id=resolved_org_id,
+                max_retries=resolved_max_retries,
+                timeout=resolved_timeout,
+                stream_timeout=resolved_stream_timeout,
+            )
+            self.api_tokens = ApiTokensResource(admin_http)
+            self._admin_http = admin_http
 
         if resolved_api_key:
             http = AsyncHTTPClient(
@@ -124,6 +155,12 @@ class AsyncCominty:
             )
             self.files = FilesResource(http)
             self.usage = UsageResource(http)
+            self.agents = AgentsResource(
+                http,
+                admin_http=self._admin_http,
+                threads=self.threads,
+                default_user_id=resolved_user_id,
+            )
         else:
             self._http = None
             self.threads = None  # type: ignore[assignment]
@@ -131,19 +168,10 @@ class AsyncCominty:
             self.chat = None  # type: ignore[assignment]
             self.files = None  # type: ignore[assignment]
             self.usage = None  # type: ignore[assignment]
-        self.api_tokens: ApiTokensResource | None = None
-        self._admin_http: AsyncHTTPClient | None = None
-        if resolved_session_token:
-            admin_http = AsyncHTTPClient(
-                base_url=resolved_base_url,
-                api_key=resolved_session_token,
-                org_id=resolved_org_id,
-                max_retries=resolved_max_retries,
-                timeout=resolved_timeout,
-                stream_timeout=resolved_stream_timeout,
-            )
-            self.api_tokens = ApiTokensResource(admin_http)
-            self._admin_http = admin_http
+            if self._admin_http is not None:
+                self.agents = AgentsResource(self._admin_http)
+            else:
+                self.agents = None  # type: ignore[assignment]
 
     async def close(self) -> None:
         if self._http is not None:

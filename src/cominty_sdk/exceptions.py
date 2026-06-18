@@ -24,6 +24,11 @@ class ComintyError(Exception):
 class ComintyAPIError(ComintyError):
     """Raised when the API returns an error response."""
 
+    def __str__(self) -> str:
+        if self.status_code is not None:
+            return f"{self.message} (HTTP {self.status_code})"
+        return self.message
+
 
 class AuthenticationError(ComintyAPIError):
     """Raised on 401 Unauthorized."""

@@ -1,3 +1,4 @@
+from cominty_sdk.models.agents import AgentMode, AgentOut
 from cominty_sdk.models.files import (
     ConversationFileOut,
     FileUploadConfirmation,
@@ -19,6 +20,8 @@ from cominty_sdk.models.usage import AgentDetail, UsageReport
 
 __all__ = [
     "AgentDetail",
+    "AgentMode",
+    "AgentOut",
     "ChatOptions",
     "ChatRequest",
     "ConversationFileOut",

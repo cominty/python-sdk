@@ -13,6 +13,7 @@ from cominty_sdk.exceptions import (
     ServerError,
     ValidationError,
 )
+from cominty_sdk.models.agents import AgentMode, AgentOut
 from cominty_sdk.models.files import ConversationFileOut
 from cominty_sdk.models.messages import (
     DocumentCitation,
@@ -25,6 +26,8 @@ from cominty_sdk.models.threads import ThreadOut, ThreadSummaryOut
 from cominty_sdk.models.usage import UsageReport
 
 __all__ = [
+    "AgentMode",
+    "AgentOut",
     "AsyncCominty",
     "AuthenticationError",
     "ComintyAPIError",
