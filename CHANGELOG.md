@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Public `cominty_sdk.qa` namespace exposing stable QA helpers
+  (`is_stream_terminal_event`, cite-tag patterns, tool/citation extractors) so
+  external test suites no longer import the private `_qa` module.
+
 ## [0.1.1] - 2026-06-18
 
 ### Added
