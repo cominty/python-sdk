@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-19
+
+### Added
+- `agents.create()` (`POST /agents`) and `agents.update()` (`PUT /agents/{id}`)
+  to manage org agents with an API key — no Clerk session required.
+
 ## [0.1.1] - 2026-06-18
 
 ### Added
@@ -29,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial async client `AsyncCominty` covering threads, chat, messages
   (send/stream/export/cancel), files (upload/download), usage, and API tokens.
 
-[Unreleased]: https://github.com/cominty/python-sdk/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/cominty/python-sdk/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/cominty/python-sdk/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/cominty/python-sdk/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/cominty/python-sdk/releases/tag/v0.1.0

@@ -1,6 +1,6 @@
 [project]
 name = "cominty-sdk"
-version = "0.1.1"
+version = "0.2.0rc1"
 description = "Official async Python client for the Cominty managed agent chat API"
 readme = "README.md"
 requires-python = ">=3.11"
