@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import builtins
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from cominty_sdk._http import AsyncHTTPClient
 from cominty_sdk.exceptions import AuthenticationError, ComintyAPIError
-from cominty_sdk.models.agents import AgentOut
+from cominty_sdk.models.agents import AgentMode, AgentOut
 
 if TYPE_CHECKING:
     from cominty_sdk.resources.threads import ThreadsResource
@@ -85,3 +85,61 @@ class AgentsResource:
                 owner="",
             )
         return list(seen.values())
+
+    async def _write(self, method: str, path: str, payload: dict[str, Any]) -> AgentOut:
+        """POST/PUT against /agents, trying the admin then API-token client."""
+        last_error: ComintyAPIError | None = None
+        for http in (self._admin_http, self._http):
+            if http is None:
+                continue
+            try:
+                return await http.request_model(method, path, AgentOut, json=payload)
+            except ComintyAPIError as exc:
+                last_error = exc
+                # Only fall through on auth/permission errors; surface 404 etc.
+                if exc.status_code in {401, 403}:
+                    continue
+                raise
+        if last_error is not None:
+            raise last_error
+        raise AuthenticationError(
+            "No HTTP client available for managing agents. "
+            "Set COMINTY_API_KEY or COMINTY_SESSION_TOKEN.",
+        )
+
+    async def create(
+        self,
+        *,
+        name: str,
+        mode: AgentMode | str,
+        description: str | None = None,
+        instructions: str | None = None,
+    ) -> AgentOut:
+        """Create an org agent (POST /agents). Requires an API token or admin session."""
+        payload: dict[str, Any] = {"name": name, "mode": AgentMode(mode).value}
+        if description is not None:
+            payload["description"] = description
+        if instructions is not None:
+            payload["instructions"] = instructions
+        return await self._write("POST", "/agents", payload)
+
+    async def update(
+        self,
+        agent_id: str,
+        *,
+        name: str | None = None,
+        mode: AgentMode | str | None = None,
+        description: str | None = None,
+        instructions: str | None = None,
+    ) -> AgentOut:
+        """Update an org agent (PUT /agents/{id}). Only provided fields are changed."""
+        payload: dict[str, Any] = {}
+        if name is not None:
+            payload["name"] = name
+        if mode is not None:
+            payload["mode"] = AgentMode(mode).value
+        if description is not None:
+            payload["description"] = description
+        if instructions is not None:
+            payload["instructions"] = instructions
+        return await self._write("PUT", f"/agents/{agent_id}", payload)
