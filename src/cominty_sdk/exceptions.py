@@ -1,94 +1,248 @@
+"""Exception hierarchy for the Cominty SDK.
+
+::
+
+    ComintyError
+    ├── APIError              # HTTP 4xx/5xx
+    │   ├── AuthError         # 401
+    │   ├── PermissionError   # 403
+    │   ├── NotFoundError     # 404
+    │   ├── ConflictError     # 409
+    │   ├── RateLimitError    # 429
+    │   └── ServerError       # 5xx
+    ├── APIConnectionError    # network / timeout
+    ├── StreamInterrupted     # server shut down mid-stream
+    └── SDKError              # bug in the SDK itself
+
+The wire error body is FastAPI's ``{"detail": str | dict | list}`` — parsed onto
+``APIError.detail``, with the full body kept on ``.body``.
+"""
+
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
-from cominty_sdk.config import DEFAULT_BASE_URLS, ComintyEnvironment
+from pydantic import ValidationError
+
+if TYPE_CHECKING:
+    from .models.chat import Message
+
+__all__ = [
+    "ComintyError",
+    "APIError",
+    "AuthError",
+    "PermissionError",
+    "NotFoundError",
+    "ConflictError",
+    "RateLimitError",
+    "ServerError",
+    "APIConnectionError",
+    "StreamInterrupted",
+    "SDKError",
+    "InvalidParam",
+    "InvalidParams",
+    "error_from_response",
+]
 
 
 class ComintyError(Exception):
-    """Base exception for all Cominty SDK errors."""
+    """Base class for every error raised by the SDK."""
+
+
+class APIError(ComintyError):
+    """An HTTP error response (4xx/5xx) from the Cominty API."""
 
     def __init__(
         self,
         message: str,
         *,
-        status_code: int | None = None,
-        body: Any | None = None,
+        status_code: int,
+        detail: str | dict[str, Any] | list[Any] | None = None,
+        body: Any = None,  # noqa: ANN401 - raw decoded error body
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         super().__init__(message)
-        self.message = message
         self.status_code = status_code
+        self.detail = detail
+        """The parsed ``detail`` field: a string, an object, or a list (422)."""
         self.body = body
+        """The full raw decoded response body, if any."""
+        self.headers = headers
 
 
-class ComintyAPIError(ComintyError):
-    """Raised when the API returns an error response."""
-
-    def __str__(self) -> str:
-        if self.status_code is not None:
-            return f"{self.message} (HTTP {self.status_code})"
-        return self.message
+class AuthError(APIError):
+    """401 — missing or invalid ``x-cominty-token``."""
 
 
-class AuthenticationError(ComintyAPIError):
-    """Raised on 401 Unauthorized."""
+class PermissionError(APIError):  # noqa: A001 - intentional, namespaced under the SDK
+    """403 — authenticated but not allowed."""
 
 
-class NotFoundError(ComintyAPIError):
-    """Raised on 404 Not Found."""
+class NotFoundError(APIError):
+    """404 — the resource does not exist."""
 
 
-class ValidationError(ComintyAPIError):
-    """Raised on 422 Unprocessable Entity."""
+class ConflictError(APIError):
+    """409 — the request conflicts with the current state."""
 
 
-class RateLimitError(ComintyAPIError):
-    """Raised on 429 Too Many Requests."""
+class RateLimitError(APIError):
+    """429 — quota or concurrency limit reached."""
+
+    @property
+    def reset_at(self) -> datetime | None:
+        """When the limit resets, if the server reported it (in the body detail
+        or the ``X-RateLimit-Reset`` header)."""
+        if isinstance(self.detail, dict):
+            raw = self.detail.get("reset_at") or self.detail.get("locked_until")
+            if isinstance(raw, str):
+                try:
+                    return datetime.fromisoformat(raw)
+                except ValueError:
+                    pass
+        if self.headers:
+            raw = self.headers.get("X-RateLimit-Reset")
+            if raw:
+                try:
+                    return datetime.fromisoformat(raw)
+                except ValueError:
+                    pass
+        return None
 
 
-class ServerError(ComintyAPIError):
-    """Raised on 5xx server errors."""
+class ServerError(APIError):
+    """5xx — the server failed to handle the request."""
 
 
-class ComintyTimeoutError(ComintyError):
-    """Raised when a request or poll operation times out."""
+class APIConnectionError(ComintyError):
+    """The request never produced an HTTP response (network error or timeout)."""
 
 
-class ComintyServerShuttingDownError(ComintyError):
-    """Raised when the API returns a partial response due to server shutdown."""
+class StreamInterrupted(ComintyError):
+    """The server shut down mid-stream before the message completed.
+
+    ``partial`` is the message as far as it got — its ``status`` reflects how
+    much was persisted.
+    """
+
+    def __init__(self, message: str, *, partial: Message) -> None:
+        super().__init__(message)
+        self.partial = partial
 
 
-def raise_for_status(status_code: int, body: Any, message: str | None = None) -> None:
-    """Map HTTP status codes to typed exceptions."""
-    msg = message or f"API request failed with status {status_code}"
-    if status_code == 401:
-        raise AuthenticationError(msg, status_code=status_code, body=body)
-    if status_code == 404:
-        raise NotFoundError(msg, status_code=status_code, body=body)
-    if status_code == 422:
-        raise ValidationError(msg, status_code=status_code, body=body)
-    if status_code == 429:
-        raise RateLimitError(msg, status_code=status_code, body=body)
-    if 500 <= status_code < 600:
-        raise ServerError(msg, status_code=status_code, body=body)
-    if 400 <= status_code < 500:
-        raise ComintyAPIError(msg, status_code=status_code, body=body)
+class SDKError(ComintyError):
+    """A bug inside the SDK. Should never reach users."""
 
 
-def resolve_base_url(
-    *,
-    base_url: str | None = None,
-    environment: ComintyEnvironment | str | None = None,
-) -> str:
-    """Resolve the API base URL from explicit override or environment name."""
-    if base_url is not None:
-        return base_url.rstrip("/")
-    env = environment or ComintyEnvironment.PRODUCTION
-    env_name = env.value if isinstance(env, ComintyEnvironment) else env
-    try:
-        return DEFAULT_BASE_URLS[env_name].rstrip("/")
-    except KeyError as exc:
-        raise ValueError(
-            f"Unknown environment {env_name!r}. "
-            f"Expected one of: {', '.join(DEFAULT_BASE_URLS)}"
-        ) from exc
+class InvalidParam(TypedDict):
+    """One offending parameter in an :class:`InvalidParams` error."""
+
+    param: str
+    """The public argument that failed, e.g. ``"disabled_tools[0]"``."""
+    message: str
+    """Why it failed (the underlying validation message)."""
+    input: Any
+    """The bad value (``None`` for missing/unexpected params)."""
+
+
+class InvalidParams(ComintyError):
+    """Arguments failed validation before any request was sent.
+
+    Raised by the SDK at the call boundary so callers never see a raw pydantic
+    ``ValidationError``. ``errors`` is the structured, typed breakdown — one entry
+    per offending parameter.
+    """
+
+    def __init__(self, message: str, *, errors: list[InvalidParam]) -> None:
+        super().__init__(message)
+        self.errors = errors
+
+    @classmethod
+    def from_validation_error(
+        cls, exc: ValidationError, *, context: str
+    ) -> InvalidParams:
+        """Translate a pydantic ``ValidationError`` into a clean SDK error.
+
+        ``context`` names the operation for the message header, e.g. ``"chat.start"``.
+        """
+        grouped: dict[str, dict[str, Any]] = {}
+        for err in exc.errors(include_url=False):
+            path = _clean_param_path(err["loc"])
+            group = grouped.setdefault(
+                path, {"msgs": [], "input": None, "show_input": False}
+            )
+            if err["msg"] not in group["msgs"]:
+                group["msgs"].append(err["msg"])
+            # "missing"/"extra_forbidden" carry the parent container as input —
+            # noise, so don't surface a value for those.
+            if err["type"] not in _NO_INPUT_TYPES:
+                group["show_input"] = True
+                group["input"] = err.get("input")
+
+        errors: list[InvalidParam] = []
+        lines: list[str] = []
+        for path, group in grouped.items():
+            message = " / ".join(group["msgs"])
+            errors.append(InvalidParam(param=path, message=message, input=group["input"]))
+            suffix = f" (got {group['input']!r})" if group["show_input"] else ""
+            lines.append(f"  - {path}: {message}{suffix}")
+
+        body = "\n".join(lines)
+        return cls(f"Invalid parameters for {context}:\n{body}", errors=errors)
+
+
+_NO_INPUT_TYPES = frozenset({"missing", "extra_forbidden"})
+
+
+def _clean_param_path(loc: tuple[str | int, ...]) -> str:
+    """Turn a pydantic ``loc`` into the public argument name.
+
+    Drops the internal ``message``/``options`` request wrappers and pydantic's
+    synthetic union/type tags (``"literal[...]"``, ``"constrained-str"``) — those
+    always contain ``[`` or ``-``, which a Python identifier never can.
+    """
+    parts: list[str | int] = [
+        seg
+        for seg in loc
+        if isinstance(seg, int) or ("[" not in seg and "-" not in seg)
+    ]
+    if parts and parts[0] in ("message", "options"):
+        parts = parts[1:]
+
+    out = ""
+    for part in parts:
+        out = f"{out}[{part}]" if isinstance(part, int) else (part if not out else f"{out}.{part}")
+    return out or "(request)"
+
+
+_STATUS_MAP: dict[int, type[APIError]] = {
+    401: AuthError,
+    403: PermissionError,
+    404: NotFoundError,
+    409: ConflictError,
+    429: RateLimitError,
+}
+
+
+def error_from_response(
+    status_code: int,
+    body: Any,  # noqa: ANN401 - raw decoded error body
+    headers: Mapping[str, str] | None = None,
+) -> APIError:
+    """Build the right :class:`APIError` subclass from a failed HTTP response."""
+    detail: str | dict[str, Any] | list[Any] | None = None
+    if isinstance(body, dict):
+        detail = cast("dict[str, Any]", body).get("detail")
+    message = detail if isinstance(detail, str) else f"HTTP {status_code}"
+    cls = _STATUS_MAP.get(status_code) or (
+        ServerError if status_code >= 500 else APIError
+    )
+    return cls(
+        message,
+        status_code=status_code,
+        detail=detail,
+        body=body,
+        headers=headers,
+    )

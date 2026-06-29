@@ -1,60 +1,76 @@
-"""Cominty SDK — async Python client for the managed agent chat API."""
+"""Official async Python client for the Cominty managed agent chat API."""
 
-from importlib.metadata import PackageNotFoundError, version
+from __future__ import annotations
 
-from cominty_sdk.client import AsyncCominty
-from cominty_sdk.config import DEFAULT_AGENT_ID, DEFAULT_API_URL, ComintyEnvironment
-from cominty_sdk.exceptions import (
-    AuthenticationError,
-    ComintyAPIError,
+from . import events
+from ._version import __version__
+from .client import AsyncCominty
+from .exceptions import (
+    APIConnectionError,
+    APIError,
+    AuthError,
     ComintyError,
-    ComintyServerShuttingDownError,
-    ComintyTimeoutError,
+    ConflictError,
+    InvalidParam,
+    InvalidParams,
     NotFoundError,
+    PermissionError,
     RateLimitError,
+    SDKError,
     ServerError,
-    ValidationError,
+    StreamInterrupted,
 )
-from cominty_sdk.models.agents import AgentMode, AgentOut
-from cominty_sdk.models.files import ConversationFileOut
-from cominty_sdk.models.messages import (
-    DocumentCitation,
+from .models.chat import (
+    Agent,
+    ContentOrigin,
+    ConversationFile,
+    DisablableTool,
     HumanMessage,
-    MessageOut,
+    Message,
+    MessageRole,
+    MessageStatus,
     Question,
-    WebCitation,
+    ShareLink,
+    StartChatOptions,
+    StartChatParams,
+    Thread,
+    ThreadSummary,
 )
-from cominty_sdk.models.threads import ThreadOut, ThreadSummaryOut
-from cominty_sdk.models.usage import UsageReport
+from .streaming import AssistantRun, StartedChat
 
 __all__ = [
-    "AgentMode",
-    "AgentOut",
+    "__version__",
     "AsyncCominty",
-    "AuthenticationError",
-    "ComintyAPIError",
-    "ComintyEnvironment",
-    "DEFAULT_AGENT_ID",
-    "DEFAULT_API_URL",
+    "AssistantRun",
+    "StartedChat",
+    "events",
+    # exceptions
     "ComintyError",
-    "ComintyServerShuttingDownError",
-    "ComintyTimeoutError",
-    "ConversationFileOut",
-    "DocumentCitation",
-    "HumanMessage",
-    "MessageOut",
+    "APIError",
+    "AuthError",
+    "PermissionError",
     "NotFoundError",
-    "Question",
+    "ConflictError",
     "RateLimitError",
     "ServerError",
-    "ThreadOut",
-    "ThreadSummaryOut",
-    "UsageReport",
-    "ValidationError",
-    "WebCitation",
+    "APIConnectionError",
+    "StreamInterrupted",
+    "SDKError",
+    "InvalidParam",
+    "InvalidParams",
+    # models
+    "Agent",
+    "ContentOrigin",
+    "ConversationFile",
+    "DisablableTool",
+    "HumanMessage",
+    "Message",
+    "MessageRole",
+    "MessageStatus",
+    "Question",
+    "ShareLink",
+    "StartChatOptions",
+    "StartChatParams",
+    "Thread",
+    "ThreadSummary",
 ]
-
-try:
-    __version__ = version("cominty-sdk")
-except PackageNotFoundError:  # running from a source tree without an install
-    __version__ = "0.0.0+unknown"
