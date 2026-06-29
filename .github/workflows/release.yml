@@ -1,135 +1,47 @@
 name: Release
 
-# Publishing is driven entirely by git tags.
-#
-#   v0.2.0rc1 / v0.2.0a1 / v0.2.0b1 / v0.2.0.dev1  → TestPyPI only (dry run)
-#   v0.2.0    (final semver)                       → TestPyPI, then PyPI
-#
-# So the clean release loop is:
-#   1. bump `version` in pyproject.toml
-#   2. push a pre-release tag, verify it on TestPyPI
-#   3. push the final tag to ship to PyPI
-#
-# Auth uses PyPI Trusted Publishing (OIDC) — no API tokens stored in GitHub.
-# See the README "Releasing" section for the one-time PyPI/TestPyPI setup.
-
+# Publishes to PyPI when a GitHub Release is published.
+# Uses PyPI Trusted Publishing (OIDC) — no API token stored anywhere.
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
 
 permissions:
   contents: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12", "3.13"]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv sync --all-extras --dev
-
-      - name: Ruff
-        run: uv run ruff check .
-
-      - name: Mypy
-        run: uv run mypy
-
-      - name: Pytest
-        run: uv run pytest
-
   build:
-    needs: test
+    name: Build distributions
     runs-on: ubuntu-latest
-    outputs:
-      prerelease: ${{ steps.meta.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.11
-
-      - name: Verify tag matches package version
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-          if [ "$TAG" != "$VERSION" ]; then
-            echo "Tag v${TAG} does not match pyproject.toml version ${VERSION}"
-            exit 1
-          fi
-
-      - name: Classify release (final vs pre-release)
-        id: meta
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          if echo "$TAG" | grep -qiE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build sdist and wheel
+        uses: astral-sh/setup-uv@v6
+      - name: Build sdist + wheel
         run: uv build
-
-      - name: Upload distributions
+      - name: Validate metadata
+        run: uv run --with twine twine check dist/*
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
 
-  publish-testpypi:
+  publish:
+    name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/cominty-sdk
-    permissions:
-      id-token: write # required for Trusted Publishing (OIDC)
-    steps:
-      - name: Download distributions
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
-
-  publish-pypi:
-    needs: [build, publish-testpypi]
-    if: needs.build.outputs.prerelease == 'false'
-    runs-on: ubuntu-latest
+    # The environment name must match the Trusted Publisher config on PyPI.
     environment:
       name: pypi
       url: https://pypi.org/p/cominty-sdk
     permissions:
-      id-token: write # required for Trusted Publishing (OIDC)
+      id-token: write   # required for OIDC / Trusted Publishing
     steps:
-      - name: Download distributions
+      - name: Download built distributions
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
