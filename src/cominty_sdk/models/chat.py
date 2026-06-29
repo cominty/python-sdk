@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from enum import StrEnum
-from typing import Annotated, Any, Literal
+from enum import Enum
+from typing import Annotated, Any, Literal, Union
 from uuid import UUID
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
+from typing_extensions import TypeAlias
 
 __all__ = [
     # enums / aliases
@@ -47,12 +48,12 @@ _MAX_FILES = 5
 # --------------------------------------------------------------------------- #
 # Enums & aliases
 # --------------------------------------------------------------------------- #
-class MessageRole(StrEnum):
+class MessageRole(str, Enum):
     user = "user"
     assistant = "assistant"
 
 
-class MessageStatus(StrEnum):
+class MessageStatus(str, Enum):
     pending = "pending"
     running = "running"
     success = "success"
@@ -60,7 +61,7 @@ class MessageStatus(StrEnum):
     cancelled = "cancelled"
 
 
-class ContentOrigin(StrEnum):
+class ContentOrigin(str, Enum):
     user = "user"
     agent = "agent"
 
@@ -80,7 +81,7 @@ def _validate_user_id(value: str) -> str:
     return value
 
 
-type UserId = Annotated[str, AfterValidator(_validate_user_id)]
+UserId: TypeAlias = Annotated[str, AfterValidator(_validate_user_id)]
 """A Cominty (Clerk) user id, pattern-checked before any request is sent so a
 typo'd or malformed id fails locally instead of as a server 400/404."""
 
@@ -92,10 +93,10 @@ DISABLE_ALL_MCP = f"{DISABLE_MCP_PREFIX}*"
 """Wildcard token that disables every connected MCP server at once."""
 
 # TODO: include the wildcard * for disable all, can it be with the other literals?
-type DisablableTool = (
-    Literal["web", "company_documents"]
-    | Annotated[str, StringConstraints(pattern=rf"^{DISABLE_MCP_PREFIX}.+")]
-)
+DisablableTool: TypeAlias = Union[
+    Literal["web", "company_documents"],
+    Annotated[str, StringConstraints(pattern=rf"^{DISABLE_MCP_PREFIX}.+")],
+]
 """A tool the agent may disable: the built-in ``"web"`` / ``"company_documents"``,
 or an MCP token ``"mcp:<server>"`` (``"mcp:*"`` for all). The MCP arm is regex-
 validated, so arbitrary strings are rejected rather than silently sent."""

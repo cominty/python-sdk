@@ -8,51 +8,82 @@ entire codebase. Deviations require an explicit, justified comment at the call s
 
 ## 1. Language & Runtime
 
-- **Python 3.13+** is the minimum target for new code. `pyproject.toml` may list 3.11 for
-  distribution compatibility, but the _source_ is written against 3.13 semantics.
+- **Python 3.9 is the floor.** `requires-python = ">=3.9"` is a promise to users — the source
+  must import and run on 3.9 through 3.13. pyright and ruff are both pinned to `3.9`/`py39`, so
+  they will flag any syntax newer than the floor. Your local interpreter (3.13) is irrelevant;
+  the floor decides what syntax is legal, not your machine.
 - Use **modern built-in generics** everywhere — `list[str]`, `dict[str, int]`, `tuple[int, ...]`,
-  `type[T]`. Never `typing.List`, `typing.Dict`, `typing.Tuple`, etc.
-- Use **`X | Y`** for unions. Never `typing.Union[X, Y]` or `typing.Optional[X]`.
-- Use **`from __future__ import annotations`** at the top of every module to enable
-  postponed evaluation and keep forward references working without quotes.
+  `type[T]`. Never `typing.List`, `typing.Dict`, `typing.Tuple`, etc. (PEP 585 built-in generic
+  subscription works at runtime since 3.9.)
+- Use **`from __future__ import annotations`** at the top of **every** module. It stringizes all
+  annotations, so `X | Y` unions and built-in generics in *pure type-hint* positions (function
+  signatures, variable annotations) are never evaluated at runtime and work on 3.9.
+- **Unions — three cases, know which you're in:**
+  - *Pure type hints* (function args, returns, plain attribute annotations): `X | Y` is fine under
+    the future import — never evaluated at runtime.
+  - *Pydantic model fields*: `X | Y` and `list[str]` are written as usual, **but Pydantic `eval()`s
+    the annotation string at model-build time**, which would `TypeError` on 3.9. We depend on
+    **`eval-type-backport`** (`python_version < "3.10"`) so Pydantic resolves them transparently —
+    no per-field `Union[...]` needed. This is the one place the future import alone is *not* enough.
+  - *Runtime-evaluated values* — `TypeAlias` right-hand sides, `TypeAdapter(...)`, `cast(...)`,
+    `isinstance` targets: use **`typing.Union[X, Y]`**. These execute the `|` directly (not via
+    Pydantic), so the backport doesn't help and `|` on typing forms `TypeError`s on 3.9.
 
 ---
 
 ## 2. Typing System
 
-### 2.1 Generics — brackets, not aliases
+### 2.1 Generics — `TypeVar`, not PEP 695 brackets
+
+PEP 695 `[T]` syntax is **3.12+ only** — it is a hard `SyntaxError` on the 3.9 floor. Declare
+type variables explicitly with `TypeVar`:
 
 ```python
-# WRONG
+from typing import TypeVar
+
 T = TypeVar("T")
+
 def identity(x: T) -> T: ...
 
-# RIGHT (Python 3.12+ syntax)
-def identity[T](x: T) -> T: ...
-
-class Stack[T]:
+class Stack(Generic[T]):
     def push(self, item: T) -> None: ...
     def pop(self) -> T: ...
 ```
 
-Use PEP 695 type parameter syntax (`[T]`, `[T: Bound]`, `[*Ts]`) for all new generics.
-Only fall back to `TypeVar` when a third-party library forces it.
+Import `TypeVar`/`Generic`/`ParamSpec` from `typing_extensions` (a declared dependency) when you
+need features newer than the 3.9 `typing` module; otherwise plain `typing` is fine.
 
-### 2.2 ParamSpec for decorator signature transparency
+### 2.2 Type aliases — `TypeAlias`, not the `type` statement
+
+The `type X = ...` statement (PEP 695) is also **3.12+ only**. Use an annotated assignment with
+`TypeAlias` from `typing_extensions`, and `Union[...]` for the value (see §1 on runtime unions):
+
+```python
+from typing import Annotated, Literal, Union
+from typing_extensions import TypeAlias
+
+EventStatus: TypeAlias = Literal["running", "success", "error"]
+AnyEvent: TypeAlias = Union[KnownEvent, UnknownEvent]
+```
+
+### 2.3 ParamSpec for decorator signature transparency
 
 All decorators that wrap callables **must** preserve the wrapped signature using `ParamSpec`:
 
 ```python
-from typing import ParamSpec, Callable
-import asyncio
+from typing import Callable, TypeVar
+from typing_extensions import ParamSpec
 
-def retry[**P, R](fn: Callable[P, R]) -> Callable[P, R]:
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def retry(fn: Callable[P, R]) -> Callable[P, R]:
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         ...
     return wrapper  # type: ignore[return-value]  # only here, where unavoidable
 ```
 
-### 2.3 @overload for parameter-dependent return types
+### 2.4 @overload for parameter-dependent return types
 
 When a method's return type depends on the **value** of an argument, use `@overload` stubs
 so IDEs infer the correct type at each call site:
@@ -67,14 +98,27 @@ async def send(self, *, stream: Literal[True]) -> StreamHandle: ...
 async def send(self, *, stream: bool = False) -> ChatResponse | StreamHandle: ...
 ```
 
-### 2.4 Protocol over ABC for structural types
+### 2.5 Protocol over ABC for structural types
 
 Prefer `typing.Protocol` (with `runtime_checkable` when needed) over abstract base classes.
 
-### 2.5 TypedDict for plain data shapes
+### 2.6 TypedDict for plain data shapes
 
 Use `TypedDict` for dict-shaped data flowing across I/O boundaries (e.g. raw API payloads
 before parsing). Never use `dict[str, Any]` as a return type.
+
+### 2.7 String enums — `(str, Enum)`, not `StrEnum`
+
+`enum.StrEnum` is **3.11+ only**. Subclass `str` and `Enum` instead — it serializes and compares
+identically under Pydantic and works on the floor:
+
+```python
+from enum import Enum
+
+class MessageRole(str, Enum):
+    user = "user"
+    assistant = "assistant"
+```
 
 ---
 

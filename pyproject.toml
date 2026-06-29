@@ -24,6 +24,10 @@ dependencies = [
     "pydantic>=2",
     "pydantic-settings>=2",
     "typing-extensions>=4.6",
+    # Lets Pydantic evaluate `X | Y` unions and `list[str]` subscripts in model
+    # field annotations on Python < 3.10, where `|` isn't valid at runtime.
+    # Pydantic auto-detects and uses it. See AGENTS.md §1.
+    "eval-type-backport>=0.2; python_version < '3.10'",
 ]
 
 [project.urls]
@@ -70,6 +74,13 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.ruff.lint.per-file-ignores]
+# Unshipped dev entrypoints (excluded from the sdist): manual endpoint-poking
+# scripts and the invoke task runner. Real lint (unused imports, bugs) still
+# applies, but full type annotations are needless ceremony here — invoke tasks
+# idiomatically take an unannotated Context.
+"tasks.py" = ["ANN"]
 
 [tool.pyright]
 pythonVersion = "3.9"

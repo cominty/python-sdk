@@ -13,9 +13,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from typing_extensions import TypeAlias
 
 from .models.chat import Question
 
@@ -35,7 +36,7 @@ __all__ = [
     "parse_event",
 ]
 
-type EventStatus = Literal["running", "success", "error"]
+EventStatus: TypeAlias = Literal["running", "success", "error"]
 
 
 class _EventBase(BaseModel):
@@ -162,17 +163,19 @@ class UnknownEvent(_EventBase):
     data: dict[str, Any] | None = None
 
 
-type _Known = Annotated[
-    WaitingForStart
-    | SettingUpSandbox
-    | UploadingFile
-    | LlmStep
-    | IntermediaryUpdate
-    | ToolCall
-    | Result,
+_Known: TypeAlias = Annotated[
+    Union[
+        WaitingForStart,
+        SettingUpSandbox,
+        UploadingFile,
+        LlmStep,
+        IntermediaryUpdate,
+        ToolCall,
+        Result,
+    ],
     Field(discriminator="name"),
 ]
-type AnyEvent = _Known | UnknownEvent
+AnyEvent: TypeAlias = Union[_Known, UnknownEvent]
 
 _known_adapter: TypeAdapter[_Known] = TypeAdapter(_Known)
 
