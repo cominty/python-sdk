@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed API-key authentication mode and end-user id handling.
 
 ### Docs
-- Setup now points to [platform.cominty.com](https://platform.cominty.com) for
+- Setup now points to [platform.cominty.ai](https://platform.cominty.ai) for
   creating API keys and finding agent ids.
 
 ## [0.1.0]

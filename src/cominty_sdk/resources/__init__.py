@@ -3,5 +3,6 @@
 from __future__ import annotations
 
 from .chat import ChatResource
+from .threads import ThreadsResource
 
-__all__ = ["ChatResource"]
+__all__ = ["ChatResource", "ThreadsResource"]

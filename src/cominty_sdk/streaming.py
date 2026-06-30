@@ -19,7 +19,7 @@ from uuid import UUID
 
 from .events import AnyEvent, parse_event
 from .exceptions import SDKError, StreamInterrupted
-from .models.chat import Message, Thread
+from .models.chat import Message, Question, Thread
 
 if TYPE_CHECKING:
     from ._transport import AsyncTransport
@@ -117,6 +117,17 @@ class AssistantRun:
     async def text(self) -> str:
         """The assistant's final reply text."""
         return (await self.result()).content
+
+    async def questions(self) -> list[Question]:
+        """Clarifying questions the agent is asking, if any.
+
+        When the agent needs more input it ends its turn with one or more
+        :class:`~.models.chat.Question` (each a ``prompt`` plus suggested
+        ``options``). Answer by sending the chosen option — or free text — as the
+        next message: ``await client.chat.send(run.thread.id, message=...,
+        agent_id=...)``. Empty list means the agent gave a final answer.
+        """
+        return (await self.result()).questions or []
 
     async def aclose(self) -> None:
         if self._gen is not None:

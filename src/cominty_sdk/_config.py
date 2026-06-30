@@ -11,6 +11,7 @@ _DEFAULT_BASE_URL = "https://ds.cominty.com"
 _DEFAULT_TIMEOUT = 60.0
 _TOKEN_ENV = "COMINTY_API_KEY"
 _BASE_URL_ENV = "COMINTY_BASE_URL"
+_USER_ID_ENV = "COMINTY_USER_ID"
 
 
 @dataclass(frozen=True)
@@ -18,10 +19,12 @@ class Config:
     """Immutable, fully-resolved client configuration. Built once at construction.
 
     Internal plumbing, not an I/O boundary — a frozen dataclass, not a pydantic
-    model. Validation belongs on the request/response models.
+    model. This layer only resolves values and checks the required ones are
+    present; format validation belongs on the request/response models.
     """
 
     api_token: str
+    user_id: str
     base_url: str
     timeout: float
 
@@ -30,6 +33,7 @@ class Config:
         cls,
         *,
         api_token: str | None,
+        user_id: str | None,
         base_url: str | None,
         timeout: float | None,
     ) -> Config:
@@ -40,8 +44,16 @@ class Config:
                 f"api_token is required: pass api_token=... or set {_TOKEN_ENV} "
                 "in the environment."
             )
+        resolved_user_id = user_id or os.getenv(_USER_ID_ENV)
+        if not resolved_user_id:
+            raise ValueError(
+                f"user_id is required: pass user_id=... or set {_USER_ID_ENV} in "
+                "the environment. Find yours at platform.cominty.ai -> avatar "
+                "(top right) -> Profile."
+            )
         return cls(
             api_token=token,
+            user_id=resolved_user_id,
             base_url=(base_url or os.getenv(_BASE_URL_ENV) or _DEFAULT_BASE_URL).rstrip(
                 "/"
             ),
