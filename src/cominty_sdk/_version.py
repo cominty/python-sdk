@@ -7,4 +7,4 @@ Bump it via the invoke tasks: ``invoke bump --part=patch|minor|major``.
 
 from __future__ import annotations
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
