@@ -53,7 +53,7 @@ async def test_returns_started_chat_with_thread_and_reply(
 ) -> None:
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
 
-    run = await client.chat.start(agent_id="agt_1", message="hi", user_id=USER_ID)
+    run = await client.chat.start(agent_id="agt_1", message="hi")
 
     assert isinstance(run, StartedChat)
     assert str(run.thread.id) == ids.thread
@@ -65,7 +65,7 @@ async def test_thread_is_non_optional_on_started_chat(
     client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
 ) -> None:
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
-    run = await client.chat.start(agent_id="agt_1", message="hi", user_id=USER_ID)
+    run = await client.chat.start(agent_id="agt_1", message="hi")
     # StartedChat narrows thread to Thread (never None) — accessible without a guard.
     assert run.thread.messages[0].role.value == "user"
 
@@ -80,7 +80,7 @@ async def test_sends_post_with_token_and_minimal_body(
         return_value=httpx.Response(200, json=make_thread())
     )
 
-    await client.chat.start(agent_id="agt_1", message="hi", user_id=USER_ID)
+    await client.chat.start(agent_id="agt_1", message="hi")
 
     request = route.calls.last.request
     assert request.method == "POST"
@@ -103,7 +103,6 @@ async def test_includes_optional_fields_when_provided(
     await client.chat.start(
         agent_id="agt_1",
         message="hi",
-        user_id=USER_ID,
         name="My chat",
         file_ids=["f1", "f2"],
         source_ids=[1, 2],
@@ -124,7 +123,7 @@ async def test_start_does_not_open_the_stream(
 ) -> None:
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
 
-    await client.chat.start(agent_id="agt_1", message="hi", user_id=USER_ID)
+    await client.chat.start(agent_id="agt_1", message="hi")
 
     # start() only POSTs; the stream opens lazily on iteration, not here.
     assert len(mock_api.calls) == 1
@@ -140,7 +139,7 @@ async def test_valid_disabled_tools_accepted(
     )
 
     await client.chat.start(
-        agent_id="a", message="hi", user_id=USER_ID, disabled_tools=[tool]
+        agent_id="a", message="hi", disabled_tools=[tool]
     )
 
     assert route.called
@@ -154,8 +153,10 @@ async def test_uses_configured_base_url(make_thread: MakeThread) -> None:
         route = router.post("/chat").mock(
             return_value=httpx.Response(200, json=make_thread())
         )
-        async with AsyncCominty(api_token="t", base_url="https://sandbox.test") as c:
-            await c.chat.start(agent_id="a", message="hi", user_id=USER_ID)
+        async with AsyncCominty(
+            api_token="t", user_id=USER_ID, base_url="https://sandbox.test"
+        ) as c:
+            await c.chat.start(agent_id="a", message="hi")
         assert str(route.calls.last.request.url) == "https://sandbox.test/chat"
 
 
@@ -169,7 +170,7 @@ async def test_invalid_disabled_tool_raises_before_request(
 
     with pytest.raises(InvalidParams) as exc:
         await client.chat.start(
-            agent_id="a", message="hi", user_id=USER_ID, disabled_tools=["bogus"]
+            agent_id="a", message="hi", disabled_tools=["bogus"]
         )
 
     assert not route.called
@@ -185,7 +186,7 @@ async def test_invalid_source_id_type_raises(
 
     with pytest.raises(InvalidParams) as exc:
         await client.chat.start(
-            agent_id="a", message="hi", user_id=USER_ID, source_ids=["nope"]  # type: ignore[list-item]
+            agent_id="a", message="hi", source_ids=["nope"]  # type: ignore[list-item]
         )
 
     assert not route.called
@@ -198,7 +199,7 @@ async def test_content_too_long_raises(
     route = mock_api.post("/chat")
 
     with pytest.raises(InvalidParams) as exc:
-        await client.chat.start(agent_id="a", message="x" * 30_001, user_id=USER_ID)
+        await client.chat.start(agent_id="a", message="x" * 30_001)
 
     assert not route.called
     assert any(e["param"] == "content" for e in exc.value.errors)
@@ -213,8 +214,7 @@ async def test_too_many_file_ids_raises(
         await client.chat.start(
             agent_id="a",
             message="hi",
-            user_id=USER_ID,
-            file_ids=[f"f{i}" for i in range(6)],
+                file_ids=[f"f{i}" for i in range(6)],
         )
 
     assert not route.called
@@ -228,8 +228,7 @@ async def test_multiple_validation_errors_collected(
         await client.chat.start(
             agent_id="a",
             message="hi",
-            user_id=USER_ID,
-            disabled_tools=["bad"],
+                disabled_tools=["bad"],
             source_ids=["nope"],  # type: ignore[list-item]
         )
 
@@ -241,7 +240,7 @@ async def test_multiple_validation_errors_collected(
 async def test_invalid_params_message_is_clean(client: AsyncCominty) -> None:
     with pytest.raises(InvalidParams) as exc:
         await client.chat.start(
-            agent_id="a", message="hi", user_id=USER_ID, disabled_tools=["bad"]
+            agent_id="a", message="hi", disabled_tools=["bad"]
         )
 
     text = str(exc.value)
@@ -276,10 +275,61 @@ async def test_http_errors_map_to_exceptions(
     )
 
     with pytest.raises(expected):
-        await client.chat.start(agent_id="a", message="hi", user_id=USER_ID)
+        await client.chat.start(agent_id="a", message="hi")
 
 
-async def test_rate_limit_exposes_reset_at(
+# The API sends a short string detail. Concurrency is a transient cap; quota
+# cases need an admin. The SDK turns the terse detail into an actionable message.
+async def test_rate_limit_concurrency_message(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    # Exactly what the backend raises: HTTPException(429, "Too many concurrent requests").
+    mock_api.post("/chat").mock(
+        return_value=httpx.Response(429, json={"detail": "Too many concurrent requests"})
+    )
+
+    with pytest.raises(RateLimitError) as exc:
+        await client.chat.start(agent_id="a", message="hi")
+
+    err = exc.value
+    assert err.status_code == 429
+    assert err.scope == "concurrency"
+    text = str(err)
+    assert "concurrent" in text.lower()
+    assert "Wait for an in-flight request" in text  # transient — retry guidance
+    assert "admin" in text.lower()
+
+
+async def test_rate_limit_organization_quota(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    # Real shape: {"quota_reached": "organization", "reset_at": "..."}.
+    mock_api.post("/chat").mock(
+        return_value=httpx.Response(
+            429,
+            json={
+                "detail": {
+                    "quota_reached": "organization",
+                    "reset_at": "2026-06-30T00:00:00+00:00",
+                }
+            },
+        )
+    )
+
+    with pytest.raises(RateLimitError) as exc:
+        await client.chat.start(agent_id="a", message="hi")
+
+    err = exc.value
+    assert err.scope == "organization"
+    assert err.reset_at is not None
+    text = str(err)
+    assert "Organization rate limit reached" in text
+    assert "organization's total request quota" in text  # explicit it's org-wide
+    assert "Ask an organization admin to raise your plan's limit." in text
+    assert "Quota resets at 2026-06-30T00:00:00+00:00" in text
+
+
+async def test_rate_limit_user_quota(
     client: AsyncCominty, mock_api: respx.MockRouter
 ) -> None:
     mock_api.post("/chat").mock(
@@ -287,18 +337,22 @@ async def test_rate_limit_exposes_reset_at(
             429,
             json={
                 "detail": {
-                    "quota_reached": "organization",
-                    "reset_at": "2026-06-28T12:00:00+00:00",
+                    "quota_reached": "user",
+                    "reset_at": "2026-06-30T00:00:00+00:00",
                 }
             },
         )
     )
 
     with pytest.raises(RateLimitError) as exc:
-        await client.chat.start(agent_id="a", message="hi", user_id=USER_ID)
+        await client.chat.start(agent_id="a", message="hi")
 
-    assert exc.value.reset_at is not None
-    assert exc.value.status_code == 429
+    err = exc.value
+    assert err.scope == "user"
+    text = str(err)
+    assert "User rate limit reached" in text  # explicit it's the user, not the org
+    assert "user request quota" in text
+    assert "Organization rate limit" not in text
 
 
 # --------------------------------------------------------------------------- #
@@ -317,7 +371,7 @@ async def test_thread_without_assistant_message_raises_sdk_error(
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=payload))
 
     with pytest.raises(SDKError):
-        await client.chat.start(agent_id="a", message="hi", user_id=USER_ID)
+        await client.chat.start(agent_id="a", message="hi")
 
 
 async def test_picks_last_assistant_message(
@@ -339,6 +393,6 @@ async def test_picks_last_assistant_message(
     )
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=payload))
 
-    run = await client.chat.start(agent_id="a", message="hi", user_id=USER_ID)
+    run = await client.chat.start(agent_id="a", message="hi")
 
     assert str(run.message_id) == _ASSISTANT_2

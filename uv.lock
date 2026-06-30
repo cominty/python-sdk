@@ -495,7 +495,7 @@ wheels = [
 
 [[package]]
 name = "cominty-sdk"
-version = "0.1.1"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "eval-type-backport", marker = "python_full_version < '3.10'" },
@@ -517,6 +517,7 @@ dev = [
     { name = "pytest-asyncio", version = "1.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "pytest-asyncio", version = "1.4.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "respx" },
+    { name = "rich" },
     { name = "ruff" },
     { name = "twine" },
 ]
@@ -539,6 +540,7 @@ dev = [
     { name = "pytest", specifier = ">=8" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "respx", specifier = ">=0.21" },
+    { name = "rich", specifier = ">=13" },
     { name = "ruff", specifier = ">=0.6" },
     { name = "twine", specifier = ">=5" },
 ]
