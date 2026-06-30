@@ -7,284 +7,290 @@
 
 Official async Python client for the Cominty managed agent chat API.
 
+Start a conversation with an agent, stream its progress live, and manage threads
+— with a small, fully-typed surface that's the same on Python 3.9 through 3.13.
+
+```python
+import asyncio
+from cominty_sdk import AsyncCominty
+
+async def main() -> None:
+    async with AsyncCominty() as client:          # reads COMINTY_API_KEY + COMINTY_USER_ID
+        run = await client.chat.start(agent_id="__cominty_agents::agent.chat",
+                                      message="What is Cominty?")
+        print(await run.text())
+
+asyncio.run(main())
+```
+
+- **Async-first**, built on `httpx`.
+- **Fully typed** — ships `py.typed`; strict-checked with pyright. Pydantic models everywhere.
+- **One handle for streaming *and* awaiting** — iterate a run for live progress
+  events, or just `await run.text()` for the final answer.
+- **Fail-fast validation** — bad parameters raise locally, before any request.
+- **Typed errors** — every failure is a `ComintyError` subclass.
+
+---
+
 ## Requirements
 
-- Python 3.11+
-- A Cominty API key
+- **Python 3.9+**
+- A Cominty API key and your user id (see [Authentication](#authentication))
 
 ## Installation
 
 ```bash
 pip install cominty-sdk
-```
-
-Or with [uv](https://docs.astral.sh/uv/):
-
-```bash
+# or
 uv add cominty-sdk
 ```
 
-## Quick setup (3 steps)
-
-1. **Install** — `pip install cominty-sdk` (or `uv add cominty-sdk`).
-2. **Create a `.env`** — copy the template and fill in your API token:
-
-   ```bash
-   cp .env.example .env   # then edit COMINTY_API_KEY and COMINTY_USER_ID
-   ```
-
-   The SDK **loads `.env` automatically** (via `pydantic-settings`) — you don't
-   need `python-dotenv` or to export anything. A minimal `.env`:
-
-   ```dotenv
-   COMINTY_API_KEY=<your API key>
-   COMINTY_USER_ID=user_123
-   # COMINTY_AGENT_ID=__cominty_agents::agent.chat   # optional, see below
-   # COMINTY_ENVIRONMENT=production                   # dev | staging | production (default)
-   ```
-
-   Don't have a key yet? See [Authentication](#authentication) below.
-3. **Run** — see [Quick start](#quick-start).
-
-> Configuration resolution order for every option: **explicit argument** →
-> **environment variable** (incl. `.env`) → **built-in default**.
-
-`.env` is **optional** — it's a dev convenience. You can configure everything in
-code (handy when secrets come from a vault or your app's own env), and the SDK
-also reads real OS environment variables directly:
-
-```python
-client = AsyncCominty(
-    api_key="ak_...",       # explicit args win over env / .env
-    user_id="user_123",
-    environment="production",
-)
-```
-
-## Configuration
-
-| Variable | Description |
-|----------|-------------|
-| `COMINTY_API_KEY` | Your API key (required) — create one at [platform.cominty.com/api-keys](https://platform.cominty.com/api-keys) |
-| `COMINTY_USER_ID` | End-user identifier, required when starting a conversation (e.g. `user_123`) |
-| `COMINTY_AGENT_ID` | Default agent id (default: `__cominty_agents::agent.chat`) — find yours at [platform.cominty.com/agents](https://platform.cominty.com/agents) |
-| `COMINTY_API_URL` | Override base URL (default: `https://ds.cominty.com`) |
-| `COMINTY_ENVIRONMENT` | `dev`, `staging`, or `production` (default: `production`) |
-| `COMINTY_MAX_RETRIES` | Max retries on transient errors (default: `3`) |
-| `COMINTY_TIMEOUT` | Request timeout in seconds (default: `60`) |
-
-Defaults (no env required):
-
-- API URL: `https://ds.cominty.com`
-- Agent ID: `__cominty_agents::agent.chat`
-
-Other environments via `COMINTY_ENVIRONMENT`:
-
-- `dev`: `https://ds-dev.cominty.com`
-- `staging`: `https://api.staging.cominty.com`
-- `production`: `https://ds.cominty.com`
-
 ## Authentication
 
-### 1. Get your API key
+You need two things, both from [platform.cominty.ai](https://platform.cominty.ai):
 
-Create an API key from the Cominty platform:
-**https://platform.cominty.com/api-keys**
+1. **API key** → [platform.cominty.ai/api-keys](https://platform.cominty.ai/api-keys) (shown once — copy it).
+2. **Your user id** → avatar (top right) → **Profile**. It looks like `user_31HPTBuBvX20xlQNAbvxjOxPbKB`.
 
-Copy it (it's shown once) into your `.env` or environment:
+The user id identifies the end user every request acts on behalf of. It's set
+**once on the client** (or via `COMINTY_USER_ID`) and applied to every call.
+
+The simplest setup is environment variables:
 
 ```bash
 export COMINTY_API_KEY="<your API key>"
-export COMINTY_USER_ID="user_123"   # identifies the end-user of your app
+export COMINTY_USER_ID="user_..."
 ```
 
-`user_id` is **required** when starting a conversation.
-
-### 2. Get your agent id
-
-Create an agent — or pick an existing one — and copy its id from:
-**https://platform.cominty.com/agents**
-
-Agent ids look like `__cominty_agents::agent.chat` (the SDK default). Pass yours
-via `agent_id=` or `COMINTY_AGENT_ID`:
-
-```bash
-export COMINTY_AGENT_ID="__cominty_agents::agent.chat"
+```python
+async with AsyncCominty() as client:   # picks both up from the environment
+    ...
 ```
+
+…or pass them explicitly (explicit arguments win over the environment):
+
+```python
+client = AsyncCominty(api_token="<your API key>", user_id="user_...")
+```
+
+A malformed `user_id` is rejected at construction, not as a server error later.
+
+### Picking an agent
+
+Every chat call takes an `agent_id`. Browse your agents and copy an id at
+[platform.cominty.ai/agents](https://platform.cominty.ai/agents) — they look
+like `__cominty_agents::agent.chat`.
 
 ## Quick start
 
+Every conversation starts with `chat.start`, which returns a **run** — a handle
+to the assistant's in-progress reply. From there, pick the style you need.
+
+### Just get the answer
+
 ```python
-import asyncio
-
-from cominty_sdk import AsyncCominty, HumanMessage
-
-
-async def main() -> None:
-    async with AsyncCominty() as client:
-        thread, reply = await client.chat.start_and_wait(
-            HumanMessage(content="What is Cominty?"),
-            user_id="user_123",
-        )
-        print(reply.content)
-        print(reply.tool_names)
-
-
-asyncio.run(main())
+run = await client.chat.start(agent_id=AGENT_ID, message="Give me one fun fact.")
+print(await run.text())              # blocks until the agent finishes
 ```
 
-## Send a message in an existing thread
+`await run.result()` gives the full `Message` (status, files, structured output,
+questions). `text()` is shorthand for `result().content`.
+
+### Stream progress events
+
+Iterating a run yields **progress events only** — tool calls, LLM steps, the
+result event — as they happen. The finished reply is captured for you.
 
 ```python
-message = await client.messages.send_and_wait(
-    thread_id=thread.id,
-    message=HumanMessage(
-        content="Search our docs for onboarding steps",
-        source_ids=[42],
-        disabled_tools=["web"],
-    ),
-    agent_id="your-agent-id",
+from cominty_sdk import events
+
+run = await client.chat.start(agent_id=AGENT_ID, message="Research X and summarize.")
+
+async for event in run:
+    if isinstance(event, events.ToolCall):
+        print(f"tool {event.data.name} -> {event.status}")
+    elif isinstance(event, events.LlmStep):
+        print(f"llm  {event.data.description}")
+    elif isinstance(event, events.Result):
+        print(f"cost {event.data.cost.total}")
+
+print("FINAL:", await run.text())    # available after the stream drains
+```
+
+> A run's stream is single-use: iterate it **or** await its result — the result
+> is cached, so calling `text()`/`result()` after iterating is free.
+
+### Continue the conversation
+
+`chat.send(thread_id, ...)` is the mirror of `start` for an existing thread:
+same arguments, same streamable run. The agent keeps the thread's context.
+
+```python
+first = await client.chat.start(agent_id=AGENT_ID, message="Pick a language.")
+await first.text()
+
+second = await client.chat.send(
+    first.thread.id, agent_id=AGENT_ID, message="Now show hello-world in it.",
 )
+print(await second.text())
 ```
 
-## Upload a file
+### Answer the agent's questions
 
-Upload is a single high-level call that performs the 3-step S3 flow internally:
+When an agent needs more input, it ends its turn with clarifying **questions**
+(a `prompt` plus suggested `options`) instead of a final answer. Read them, then
+answer with a normal follow-up:
 
 ```python
-file_id = await client.files.upload("report.pdf")
+run = await client.chat.start(agent_id=AGENT_ID, message="Book me a room.")
+await run.text()
 
-await client.messages.send_and_wait(
-    thread_id=thread.id,
-    message=HumanMessage(content="Summarize this file", file_ids=[file_id]),
-    agent_id="your-agent-id",
+for q in await run.questions():
+    print(q.prompt, q.options)
+
+# answer = the chosen option (or free text)
+reply = await client.chat.send(run.thread.id, agent_id=AGENT_ID, message="Tomorrow 10am")
+print(await reply.text())
+```
+
+### Manage threads
+
+`client.threads` is scoped to the client's `user_id` automatically.
+
+```python
+# List & search the user's conversations (summaries — no messages)
+for t in await client.threads.list(limit=20):
+    print(t.created_at, t.name, t.id)
+
+await client.threads.list(terms=["invoice"])     # free-text search
+await client.threads.list(limit=10, page=1)       # paginate (zero-based)
+
+# Load one thread's full history
+thread = await client.threads.get(thread_id)
+print(len(thread.messages))
+
+# Partial update — only the fields you pass change (returns a ThreadSummary)
+await client.threads.update(thread_id, name="Renamed", starred=True)
+
+# Archive (soft-delete)
+await client.threads.archive(thread_id)
+```
+
+## Examples
+
+Runnable scripts for each scenario live in [`examples/`](examples/):
+
+| Script | Shows |
+|--------|-------|
+| [`01_stream_events.py`](examples/01_stream_events.py) | Stream progress events live |
+| [`02_await_result.py`](examples/02_await_result.py) | Fire and await the final answer |
+| [`03_follow_up.py`](examples/03_follow_up.py) | Continue in the same thread |
+| [`04_answer_questions.py`](examples/04_answer_questions.py) | Read & answer agent questions |
+| [`05_list_threads.py`](examples/05_list_threads.py) | List and search threads |
+| [`06_manage_thread.py`](examples/06_manage_thread.py) | Get, rename/star, archive |
+| [`07_custom_agent.py`](examples/07_custom_agent.py) | Call a custom managed agent (your own model + instructions) |
+| [`08_mcp_linear.py`](examples/08_mcp_linear.py) | Custom agent pulls live context from an MCP server (Linear) |
+
+They render colored, aligned output with [`rich`](https://github.com/Textualize/rich),
+which ships in the dev extras:
+
+```bash
+uv sync --all-extras --dev                 # installs rich (or: pip install rich)
+export COMINTY_API_KEY=... COMINTY_USER_ID=user_...
+python examples/01_stream_events.py
+```
+
+## Message parameters
+
+Both `chat.start` and `chat.send` accept:
+
+| Argument | Type | Notes |
+|----------|------|-------|
+| `agent_id` | `str` | **Required.** The agent to run. |
+| `message` | `str` | **Required.** The user's message (max 30,000 chars). |
+| `name` | `str` | `start` only — names the new thread. |
+| `file_ids` | `list[str]` | Attach previously-uploaded files (max 5). |
+| `source_ids` | `list[int]` | Restrict retrieval to specific knowledge sources. |
+| `document_ids` | `list[str]` | Restrict retrieval to specific documents. |
+| `disabled_tools` | `list[str]` | Turn tools off: `"web"`, `"company_documents"`, `"mcp:<server>"`, or `"mcp:*"` for all MCP. |
+
+Invalid values raise `InvalidParams` **before** any request is sent.
+
+## Configuration
+
+| Argument | Env var | Default |
+|----------|---------|---------|
+| `api_token` | `COMINTY_API_KEY` | — (required) |
+| `user_id` | `COMINTY_USER_ID` | — (required) |
+| `base_url` | `COMINTY_BASE_URL` | `https://ds.cominty.com` |
+| `timeout` | — | `60` (seconds) |
+
+Resolution order for each option: **explicit argument → environment variable →
+default**. The SDK does **not** auto-load `.env`; export the vars or load the
+file yourself (see [`.env.example`](.env.example)).
+
+## Error handling
+
+Every error is a subclass of `ComintyError`:
+
+```python
+from cominty_sdk import (
+    ComintyError,        # base — catch-all
+    APIError,            # any 4xx/5xx; carries .status_code and a typed .error body
+    AuthError,           # 401
+    PermissionError,     # 403
+    NotFoundError,       # 404
+    ConflictError,       # 409
+    RateLimitError,      # 429 — exposes .reset_at
+    ServerError,         # 5xx
+    APIConnectionError,  # network failure / timeout, no response
+    StreamInterrupted,   # server shut down mid-stream — carries the .partial Message
+    InvalidParams,       # client-side validation failed — .errors lists each problem
+    SDKError,            # unexpected SDK-internal condition
 )
-```
 
-## Streaming
-
-The API returns JSONL events on the stream endpoint. Terminal events include
-`name: "result", status: "success"` or a final assistant snapshot with `live: false`.
-
-By default, `wait_until_done` and `start_and_wait` consume the stream first, then
-fall back to polling `GET /chat/{thread_id}` if needed. Disable streaming:
-
-```python
-reply = await client.messages.wait_until_done(
-    message.id,
-    thread_id=thread.id,
-    prefer_stream=False,
-)
-```
-
-```python
-async for event in client.messages.stream(message.id):
-    print(event)
-```
-
-## QA helpers
-
-`MessageOut` exposes convenience accessors for automated QA:
-
-```python
-reply.tool_names           # tools invoked (from events)
-reply.cite_tags            # raw <cite .../> tags
-reply.document_citations   # parsed document citations
-reply.web_citations        # parsed web citations
-```
-
-## Covered endpoints
-
-| Resource | Methods |
-|----------|---------|
-| Threads | `list`, `get`, `update`, `archive` |
-| Chat | `start`, `start_and_wait` |
-| Messages | `send`, `send_and_wait`, `wait_until_done`, `cancel`, `export`, `stream` |
-| Files | `upload`, `download` |
-| Usage | `get` |
-| Agents | `list` |
-
-### Choosing an agent
-
-Browse your agents and copy their ids from the platform:
-**https://platform.cominty.com/agents**
-
-Pass an agent id to any chat call via `agent_id=` (or set `COMINTY_AGENT_ID`):
-
-```python
-thread, reply = await client.chat.start_and_wait(
-    HumanMessage(content="Hello"),
-    user_id="user_123",
-    agent_id="__cominty_agents::agent.chat",
-)
+try:
+    run = await client.chat.start(agent_id=AGENT_ID, message="hi")
+    print(await run.text())
+except RateLimitError as e:
+    print(f"slow down — retry after {e.reset_at}")
+except APIError as e:
+    print(f"API error {e.status_code}: {e.error}")
 ```
 
 ## Development
 
 ```bash
 uv sync --all-extras --dev
-uv run pytest
-uv run ruff check .
-uv run mypy
+uv run pytest          # tests
+uv run ruff check .    # lint
+uv run pyright         # type-check (strict)
 ```
 
-Integration tests are opt-in:
+Integration tests are opt-in (they hit the real API):
 
 ```bash
-COMINTY_API_KEY=... COMINTY_AGENT_ID=... uv run pytest -m integration
+COMINTY_API_KEY=... COMINTY_USER_ID=... uv run pytest -m integration
 ```
+
+See [AGENTS.md](AGENTS.md) for coding conventions (typing, versioning, models).
 
 ## Releasing
 
-Publishing is **tag-driven** and uses **PyPI Trusted Publishing (OIDC)** — no API
-tokens are stored in GitHub. The workflow lives in `.github/workflows/release.yml`.
-
-### How a tag maps to a registry
-
-| Tag example | Publishes to |
-|-------------|--------------|
-| `v0.2.0rc1`, `v0.2.0a1`, `v0.2.0b1`, `v0.2.0.dev1` (pre-release) | **TestPyPI** only |
-| `v0.2.0` (final semver) | **TestPyPI**, then **PyPI** |
-
-On any `v*` tag the workflow runs the test matrix, verifies the tag matches the
-`version` in `pyproject.toml`, builds the sdist + wheel, and publishes. Final
-releases go through TestPyPI first, then PyPI.
-
-### Cutting a release
+Publishing to PyPI uses **Trusted Publishing (OIDC)** — no tokens stored in
+GitHub — and is triggered by publishing a **GitHub Release**
+(`.github/workflows/release.yml`). The published version comes from
+`pyproject.toml`, so the tag is cosmetic; keep them in sync.
 
 ```bash
-# 1. Bump the version in pyproject.toml (e.g. 0.1.0 -> 0.2.0)
-
-# 2. (optional) dry-run to TestPyPI with a pre-release tag
-git tag v0.2.0rc1 && git push origin v0.2.0rc1
-#    verify: pip install -i https://test.pypi.org/simple/ cominty-sdk==0.2.0rc1
-
-# 3. ship to PyPI with the final tag
-git tag v0.2.0 && git push origin v0.2.0
+# 1. bump the version in BOTH pyproject.toml and src/cominty_sdk/_version.py
+# 2. commit on main and push
+# 3. create the release — this tags and triggers the publish
+gh release create v0.3.0 --title "v0.3.0" --generate-notes
+#    pre-release rehearsal: gh release create v0.3.0rc1 --prerelease --generate-notes
 ```
 
-### One-time setup (required before the first publish)
-
-Trusted Publishing must be registered on **both** registries — once each:
-
-1. **TestPyPI** → https://test.pypi.org/manage/account/publishing/ → add a
-   pending publisher:
-   - Project: `cominty-sdk` · Owner: `cominty` · Repo: `python-sdk`
-   - Workflow: `release.yml` · Environment: `testpypi`
-2. **PyPI** → https://pypi.org/manage/account/publishing/ → same, with
-   Environment: `pypi`.
-3. (recommended) In GitHub repo **Settings → Environments**, add required
-   reviewers to the `pypi` environment so production publishes need an approval.
-
-No secrets to configure — OIDC handles auth.
-
-### Manual publish (fallback)
-
-```bash
-uv build
-uv publish --token <pypi-token>          # PyPI
-uv publish --token <testpypi-token> --publish-url https://test.pypi.org/legacy/
-```
+A local rehearsal to TestPyPI is available via `uv run invoke publish-test`.
 
 ## License
 

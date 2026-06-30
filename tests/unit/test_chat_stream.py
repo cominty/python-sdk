@@ -430,9 +430,58 @@ async def test_start_then_stream_end_to_end(
         return_value=httpx.Response(200, text=body)
     )
 
-    run = await client.chat.start(agent_id="agt_1", message="hi", user_id=_USER_ID)
+    run = await client.chat.start(agent_id="agt_1", message="hi")
     names = [e.name async for e in run]
 
     assert run.thread.id is not None  # StartedChat: thread present
     assert names == ["result"]
     assert (await run.result()).content == "final"
+
+
+# --------------------------------------------------------------------------- #
+# Agent clarifying questions
+# --------------------------------------------------------------------------- #
+async def test_questions_surfaced_from_terminal_message(
+    client: AsyncCominty,
+    mock_api: respx.MockRouter,
+    jsonl: Jsonl,
+    make_event: MakeEvent,
+    make_message: MakeMessage,
+    ids: SimpleNamespace,
+) -> None:
+    terminal = {
+        **make_message(id=ids.assistant_msg, role="assistant", content=""),
+        "questions": [
+            {"prompt": "Which environment?", "options": ["prod", "staging"]},
+        ],
+    }
+    body = jsonl(make_event("result", id="1-0", data=_RESULT_DATA), terminal)
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(
+        return_value=httpx.Response(200, text=body)
+    )
+
+    run = client.chat.stream(UUID(ids.assistant_msg))
+    questions = await run.questions()
+
+    assert [q.prompt for q in questions] == ["Which environment?"]
+    assert questions[0].options == ["prod", "staging"]
+
+
+async def test_questions_empty_when_none(
+    client: AsyncCominty,
+    mock_api: respx.MockRouter,
+    jsonl: Jsonl,
+    make_event: MakeEvent,
+    make_message: MakeMessage,
+    ids: SimpleNamespace,
+) -> None:
+    body = jsonl(
+        make_event("result", id="1-0", data=_RESULT_DATA),
+        make_message(id=ids.assistant_msg, role="assistant", content="final"),
+    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(
+        return_value=httpx.Response(200, text=body)
+    )
+
+    run = client.chat.stream(UUID(ids.assistant_msg))
+    assert await run.questions() == []

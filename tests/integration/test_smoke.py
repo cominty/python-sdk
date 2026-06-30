@@ -1,20 +1,29 @@
+"""Opt-in smoke tests against the real API.
+
+Run with credentials in the environment:
+
+    COMINTY_API_KEY=... COMINTY_USER_ID=user_... COMINTY_AGENT_ID=... \\
+        uv run pytest -m integration
+"""
+
 from __future__ import annotations
 
 import os
 
 import pytest
 
-from cominty_sdk import AsyncCominty, HumanMessage
+from cominty_sdk import AsyncCominty
 
 pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def api_key() -> str:
+def creds() -> tuple[str, str]:
     key = os.environ.get("COMINTY_API_KEY")
-    if not key:
-        pytest.skip("COMINTY_API_KEY not set")
-    return key
+    user_id = os.environ.get("COMINTY_USER_ID")
+    if not key or not user_id:
+        pytest.skip("COMINTY_API_KEY and COMINTY_USER_ID must be set")
+    return key, user_id
 
 
 @pytest.fixture
@@ -26,18 +35,20 @@ def agent_id() -> str:
 
 
 @pytest.mark.asyncio
-async def test_list_threads(api_key: str) -> None:
-    async with AsyncCominty(api_key=api_key) as client:
+async def test_list_threads(creds: tuple[str, str]) -> None:
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
         threads = await client.threads.list(limit=5)
         assert isinstance(threads, list)
 
 
 @pytest.mark.asyncio
-async def test_start_and_wait_smoke(api_key: str, agent_id: str) -> None:
-    async with AsyncCominty(api_key=api_key, agent_id=agent_id) as client:
-        thread, message = await client.chat.start_and_wait(
-            HumanMessage(content="Reply with exactly: pong"),
-            timeout=180.0,
+async def test_start_and_get_reply(creds: tuple[str, str], agent_id: str) -> None:
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        run = await client.chat.start(
+            agent_id=agent_id, message="Reply with exactly: pong"
         )
-        assert thread.id
-        assert message.is_terminal()
+        reply = await run.result()
+        assert reply.content
+        assert str(reply.thread_id) == str(run.thread.id)

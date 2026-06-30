@@ -89,26 +89,59 @@ class ConflictError(APIError):
 
 
 class RateLimitError(APIError):
-    """429 — quota or concurrency limit reached."""
+    """429 — a rate limit was hit.
+
+    The API hits this in one of three ways, surfaced via :attr:`scope`:
+
+    - ``"concurrency"`` — too many chat sessions running at once (your plan's
+      concurrent-session cap). Transient: retry once an in-flight request finishes.
+    - ``"organization"`` — your organization's request quota is exhausted.
+    - ``"user"`` — your user's request quota is exhausted.
+
+    For the quota cases an organization admin must raise the limit; the error
+    message says so. :attr:`retry_after` exposes the ``Retry-After`` header if sent.
+    """
+
+    @property
+    def scope(self) -> str | None:
+        """Which limit was hit — ``"organization"``, ``"user"``, or
+        ``"concurrency"`` (``None`` if undeterminable).
+
+        Quota 429s carry ``{"quota_reached": "organization" | "user", ...}``;
+        the concurrency cap is a plain ``"Too many concurrent requests"`` string.
+        """
+        if isinstance(self.detail, dict):
+            quota = self.detail.get("quota_reached")
+            if isinstance(quota, str) and quota:
+                return quota
+        if isinstance(self.detail, str) and "concurrent" in self.detail.lower():
+            return "concurrency"
+        return None
+
+    @property
+    def retry_after(self) -> float | None:
+        """Seconds to wait before retrying, from the ``Retry-After`` header if set."""
+        if self.headers:
+            raw = self.headers.get("Retry-After") or self.headers.get("retry-after")
+            if raw is not None:
+                try:
+                    return float(raw)
+                except ValueError:
+                    pass
+        return None
 
     @property
     def reset_at(self) -> datetime | None:
-        """When the limit resets, if the server reported it (in the body detail
-        or the ``X-RateLimit-Reset`` header)."""
+        """When the quota clears, from the ``reset_at`` detail field (or the
+        ``X-RateLimit-Reset`` header)."""
         if isinstance(self.detail, dict):
-            raw = self.detail.get("reset_at") or self.detail.get("locked_until")
-            if isinstance(raw, str):
-                try:
-                    return datetime.fromisoformat(raw)
-                except ValueError:
-                    pass
+            parsed = _parse_dt(
+                self.detail.get("reset_at") or self.detail.get("locked_until")
+            )
+            if parsed is not None:
+                return parsed
         if self.headers:
-            raw = self.headers.get("X-RateLimit-Reset")
-            if raw:
-                try:
-                    return datetime.fromisoformat(raw)
-                except ValueError:
-                    pass
+            return _parse_dt(self.headers.get("X-RateLimit-Reset"))
         return None
 
 
@@ -239,6 +272,10 @@ def error_from_response(
     cls = _STATUS_MAP.get(status_code) or (
         ServerError if status_code >= 500 else APIError
     )
+    # A bare "HTTP 429" is useless. Turn the server's terse detail into a clear,
+    # actionable message (which limit was hit + what the caller can do).
+    if cls is RateLimitError:
+        message = _rate_limit_message(detail, headers)
     return cls(
         message,
         status_code=status_code,
@@ -246,3 +283,73 @@ def error_from_response(
         body=body,
         headers=headers,
     )
+
+
+def _parse_dt(raw: object) -> datetime | None:
+    if isinstance(raw, str):
+        try:
+            return datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+    return None
+
+
+_ADMIN_HINT = "Ask an organization admin to raise your plan's limit."
+
+# Per-scope opener, made explicit so the caller knows *which* limit was hit.
+_QUOTA_HEAD = {
+    "organization": (
+        "Organization rate limit reached: your organization's total request "
+        "quota is exhausted"
+    ),
+    "user": "User rate limit reached: your user request quota is exhausted",
+}
+
+
+def _rate_limit_message(
+    detail: str | dict[str, Any] | list[Any] | None,
+    headers: Mapping[str, str] | None,
+) -> str:
+    """Compose a clear, actionable 429 message from the server's detail.
+
+    Two shapes from the API:
+    - quota:       ``{"quota_reached": "organization" | "user", "reset_at": ...}``
+    - concurrency: the string ``"Too many concurrent requests"``
+    """
+    info = detail if isinstance(detail, dict) else {}
+    text = detail.strip() if isinstance(detail, str) else ""
+    quota = info.get("quota_reached")
+
+    if isinstance(quota, str) and quota in _QUOTA_HEAD:
+        head = _QUOTA_HEAD[quota]
+    elif isinstance(quota, str) and quota:  # forward-compat for a new scope name
+        head = f"{quota.capitalize()} rate limit reached: request quota exhausted"
+    elif "concurrent" in text.lower():
+        # Concurrency cap (CHAT_MAX_CONCURRENT_SESSIONS_*): transient — the count
+        # frees as in-flight requests finish — but raising it needs an admin.
+        return (
+            "Too many concurrent requests: your plan's limit on simultaneous chat "
+            "sessions is reached. Wait for an in-flight request to finish and "
+            f"retry, or raise the limit. {_ADMIN_HINT}"
+        )
+    else:
+        head = text or "Rate limit reached"
+
+    when = _when_phrase(_parse_dt(info.get("reset_at") or info.get("locked_until")),
+                        headers)
+    tail = f" {when}" if when else ""
+    return f"{head}. {_ADMIN_HINT}{tail}"
+
+
+def _when_phrase(reset_at: datetime | None, headers: Mapping[str, str] | None) -> str:
+    """When the caller can retry: a ``Retry-After`` delay, else a reset time."""
+    if headers:
+        raw = headers.get("Retry-After") or headers.get("retry-after")
+        if raw is not None:
+            try:
+                return f"You can retry in {float(raw):g}s."
+            except ValueError:
+                pass
+    if reset_at is not None:
+        return f"Quota resets at {reset_at.isoformat()}."
+    return ""

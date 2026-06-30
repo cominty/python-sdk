@@ -47,6 +47,7 @@ dev = [
     "nbformat>=5",
     "invoke>=2.2",
     "twine>=5",
+    "rich>=13",  # examples/ pretty terminal output (not a runtime dependency)
 ]
 
 [build-system]

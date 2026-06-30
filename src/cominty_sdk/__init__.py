@@ -35,6 +35,7 @@ from .models.chat import (
     StartChatParams,
     Thread,
     ThreadSummary,
+    UpdateThreadParams,
 )
 from .streaming import AssistantRun, StartedChat
 
@@ -73,4 +74,5 @@ __all__ = [
     "StartChatParams",
     "Thread",
     "ThreadSummary",
+    "UpdateThreadParams",
 ]

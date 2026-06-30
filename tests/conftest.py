@@ -22,11 +22,19 @@ BASE_URL = "https://api.test"
 THREAD_ID = "11111111-1111-1111-1111-111111111111"
 USER_MSG_ID = "22222222-2222-2222-2222-222222222222"
 ASSISTANT_MSG_ID = "33333333-3333-3333-3333-333333333333"
+# A well-formed Cominty (Clerk) user id — matches ^user_[A-Za-z0-9]{20,}$, which
+# the client validates at construction. Set once, applied to every call.
+USER_ID = "user_31HPTBuBvX20xlQNAbvxjOxPbKB"
 
 
 @pytest.fixture
 def base_url() -> str:
     return BASE_URL
+
+
+@pytest.fixture
+def user_id() -> str:
+    return USER_ID
 
 
 @pytest.fixture
@@ -39,7 +47,9 @@ def ids() -> SimpleNamespace:
 
 @pytest_asyncio.fixture
 async def client(base_url: str) -> AsyncIterator[AsyncCominty]:
-    async with AsyncCominty(api_token="test-token", base_url=base_url) as instance:
+    async with AsyncCominty(
+        api_token="test-token", user_id=USER_ID, base_url=base_url
+    ) as instance:
         yield instance
 
 

@@ -23,12 +23,14 @@ __all__ = [
     "ContentOrigin",
     "DisablableTool",
     "UserId",
+    "validate_user_id",
     "DISABLE_MCP_PREFIX",
     "DISABLE_ALL_MCP",
     # request models
     "HumanMessage",
     "StartChatOptions",
     "StartChatParams",
+    "UpdateThreadParams",
     # response models
     "Question",
     "Agent",
@@ -71,17 +73,22 @@ class ContentOrigin(str, Enum):
 _USER_ID_PATTERN = re.compile(r"^user_[A-Za-z0-9]{20,}$")
 
 
-def _validate_user_id(value: str) -> str:
+def validate_user_id(value: str) -> str:
+    """Return ``value`` if it's a well-formed Cominty user id, else raise.
+
+    Shared by the :data:`UserId` model type and the client, which validates the
+    client-level ``user_id`` up front so a typo fails locally, not as a 400/404.
+    """
     if not _USER_ID_PATTERN.match(value):
         raise ValueError(
             "expected a Cominty user id like 'user_xxxxxxxxxxxxxxxxxPbKB' "
             "('user_' prefix + alphanumeric token). Find yours at "
-            "platform.cominty.com -> avatar (top right) -> Profile"
+            "platform.cominty.ai -> avatar (top right) -> Profile"
         )
     return value
 
 
-UserId: TypeAlias = Annotated[str, AfterValidator(_validate_user_id)]
+UserId: TypeAlias = Annotated[str, AfterValidator(validate_user_id)]
 """A Cominty (Clerk) user id, pattern-checked before any request is sent so a
 typo'd or malformed id fails locally instead of as a server 400/404."""
 
@@ -129,6 +136,16 @@ class StartChatParams(BaseModel):
     message: HumanMessage
     options: StartChatOptions
     name: str | None = None
+
+
+class UpdateThreadParams(BaseModel):
+    """Mutable thread fields. Only the fields you pass are sent (``exclude_none``),
+    so updates are partial — omitted fields keep their current value."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    name: str | None = None
+    starred: bool | None = None
 
 
 # --------------------------------------------------------------------------- #
