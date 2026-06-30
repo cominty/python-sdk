@@ -286,8 +286,8 @@ GitHub — and is triggered by publishing a **GitHub Release**
 # 1. bump the version in BOTH pyproject.toml and src/cominty_sdk/_version.py
 # 2. commit on main and push
 # 3. create the release — this tags and triggers the publish
-gh release create v0.3.0 --title "v0.3.0" --generate-notes
-#    pre-release rehearsal: gh release create v0.3.0rc1 --prerelease --generate-notes
+gh release create v0.4.0 --title "v0.4.0" --generate-notes
+#    pre-release rehearsal: gh release create v0.4.0rc1 --prerelease --generate-notes
 ```
 
 A local rehearsal to TestPyPI is available via `uv run invoke publish-test`.
