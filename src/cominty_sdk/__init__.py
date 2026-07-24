@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
+
 from . import events
-from ._version import __version__
 from .client import AsyncCominty
 from .exceptions import (
     APIConnectionError,
@@ -38,6 +39,11 @@ from .models.chat import (
     UpdateThreadParams,
 )
 from .streaming import AssistantRun, StartedChat
+
+try:
+    __version__ = version("cominty-sdk")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 __all__ = [
     "__version__",

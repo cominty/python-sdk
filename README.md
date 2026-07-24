@@ -283,7 +283,7 @@ GitHub — and is triggered by publishing a **GitHub Release**
 `pyproject.toml`, so the tag is cosmetic; keep them in sync.
 
 ```bash
-# 1. bump the version in BOTH pyproject.toml and src/cominty_sdk/_version.py
+# 1. bump the version in pyproject.toml
 # 2. commit on main and push
 # 3. create the release — this tags and triggers the publish
 gh release create v0.4.0 --title "v0.4.0" --generate-notes

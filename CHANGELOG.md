@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `__version__` is now resolved at runtime from installed package metadata
+  (`importlib.metadata.version("cominty-sdk")`) instead of the removed
+  `src/cominty_sdk/_version.py`. Falls back to `"unknown"` when the package
+  isn't installed (e.g. a raw source checkout). The single source of truth
+  for the version is now `pyproject.toml`'s `[project] version`.
+
 ## [0.1.1] - 2026-06-18
 
 ### Added
@@ -16,8 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PyPI (final tags) via Trusted Publishing (OIDC).
 
 ### Changed
-- `__version__` is now sourced from package metadata instead of being hardcoded.
 - Fixed API-key authentication mode and end-user id handling.
+
+> **Correction (2026-07-24):** an earlier revision of this entry claimed
+> `__version__` was already sourced from package metadata as of 0.1.1. That
+> was inaccurate — the SDK still hard-coded the version via
+> `src/cominty_sdk/_version.py` at the time. The actual switch to
+> `importlib.metadata` ships under [Unreleased] above.
 
 ### Docs
 - Setup now points to [platform.cominty.ai](https://platform.cominty.ai) for

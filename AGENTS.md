@@ -379,13 +379,16 @@ No `MagicMock` on the resource classes themselves — test the real resource, fa
 
 ### 12.1 Single source of truth
 
-The version lives in **one** place: `src/cominty_sdk/_version.py` as `__version__ = "X.Y.Z"`.
+The version lives in **one** place: `pyproject.toml`'s `[project] version = "X.Y.Z"`.
+Hatchling bakes that value into the built sdist/wheel's `dist-info` metadata at build/install
+time.
 
-- It is re-exported as `cominty_sdk.__version__` (in `__init__.py` + `__all__`), so
-  `import cominty_sdk; cominty_sdk.__version__` always works at runtime.
-- `pyproject.toml` declares `dynamic = ["version"]` and hatchling reads the same file via
-  `[tool.hatch.version] path = "src/cominty_sdk/_version.py"`. Never hard-code a version in
-  `pyproject.toml` — there is exactly one number to change.
+- `cominty_sdk.__version__` (in `__init__.py` + `__all__`) resolves it back at runtime via
+  `importlib.metadata.version("cominty-sdk")` — it does not hard-code a version anywhere in
+  the package source.
+- If the package isn't installed (e.g. a raw source checkout with no `uv sync` / `pip install
+  -e .`), `importlib.metadata.version()` raises `PackageNotFoundError`; `__init__.py` catches
+  this and falls back to `__version__ = "unknown"`. See `tests/test_version.py`.
 
 ### 12.2 Local build & check (before any release)
 
@@ -411,12 +414,11 @@ uv run invoke publish-test     # check, then upload to TestPyPI (rehearsal — n
 
 ### 12.3 Cutting a release (steps)
 
-1. **Bump the version** in `src/cominty_sdk/_version.py` (the only place — see §12.1).
-   Never edit the version in `pyproject.toml`.
+1. **Bump the version** in `pyproject.toml`'s `[project] version` (the only place — see §12.1).
 2. **Verify locally**: `uv run invoke check` (and `uv run invoke publish-test` for a dry run).
 3. **Commit + tag**: `git commit -am "Release X.Y.Z"` then `git tag vX.Y.Z`; push both.
-   The tag `vX.Y.Z` must equal `_version.py` — the build derives the version from the file,
-   **not** the tag.
+   The tag `vX.Y.Z` must equal `pyproject.toml`'s version — the build derives the version from
+   that file, **not** the tag.
 4. **Publish via a GitHub Release** — create/publish a Release for tag `vX.Y.Z`
    (`gh release create vX.Y.Z` or the GitHub UI). Publishing the Release is what triggers
    the `release` workflow; a plain tag push does not.
