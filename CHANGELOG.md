@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `client.memory` — full async CRUD for per-user memory files: `list()`,
+  `create()`, `get()`, `update()`, `delete()` (`GET/POST /memory`,
+  `GET/PUT/DELETE /memory/file`). New models `MemoryFileCreate`,
+  `MemoryFileUpdate`, `MemoryFileOut`, `MemoryFileSummaryOut`. `update()` is a
+  partial update — pass only the fields you want to change, distinguishing an
+  omitted field (left untouched) from an explicit `None` (cleared) — and
+  guards against concurrent writes via an opaque `version` token, raising
+  `ConflictError` (409) on a stale value. See `examples/09_memory.py`.
+
 ### Changed
 - `__version__` is now resolved at runtime from installed package metadata
   (`importlib.metadata.version("cominty-sdk")`) instead of the removed

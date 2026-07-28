@@ -18,6 +18,7 @@ from .chat import (
     Thread,
     ThreadSummary,
 )
+from .memory import MemoryFileCreate, MemoryFileOut, MemoryFileSummaryOut, MemoryFileUpdate
 
 __all__ = [
     "Agent",
@@ -28,6 +29,10 @@ __all__ = [
     "Message",
     "MessageRole",
     "MessageStatus",
+    "MemoryFileCreate",
+    "MemoryFileOut",
+    "MemoryFileSummaryOut",
+    "MemoryFileUpdate",
     "Question",
     "ShareLink",
     "StartChatOptions",

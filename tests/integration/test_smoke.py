@@ -9,10 +9,11 @@ Run with credentials in the environment:
 from __future__ import annotations
 
 import os
+from uuid import uuid4
 
 import pytest
 
-from cominty_sdk import AsyncCominty
+from cominty_sdk import AsyncCominty, ConflictError, NotFoundError
 
 pytestmark = pytest.mark.integration
 
@@ -52,3 +53,37 @@ async def test_start_and_get_reply(creds: tuple[str, str], agent_id: str) -> Non
         reply = await run.result()
         assert reply.content
         assert str(reply.thread_id) == str(run.thread.id)
+
+
+@pytest.mark.asyncio
+async def test_memory_lifecycle(creds: tuple[str, str]) -> None:
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        path = f"sdk-integration-tests/{uuid4()}.md"
+        created = await client.memory.create(
+            path=path, purpose="integration test", content="buy milk"
+        )
+        try:
+            assert created.path == path
+            assert created.content == "buy milk"
+
+            summaries = await client.memory.list()
+            assert any(f.path == path for f in summaries)
+
+            fetched = await client.memory.get(path)
+            assert fetched.content == "buy milk"
+
+            updated = await client.memory.update(
+                path, version=fetched.version, content="buy oat milk"
+            )
+            assert updated.content == "buy oat milk"
+
+            with pytest.raises(ConflictError):
+                await client.memory.update(
+                    path, version=fetched.version, content="stale write"
+                )
+        finally:
+            await client.memory.delete(path)
+
+        with pytest.raises(NotFoundError):
+            await client.memory.get(path)

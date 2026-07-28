@@ -176,6 +176,38 @@ await client.threads.update(thread_id, name="Renamed", starred=True)
 await client.threads.archive(thread_id)
 ```
 
+### Memory files
+
+`client.memory` stores per-user files an agent can read back later — scoped to
+the client's `user_id` automatically.
+
+```python
+# Create a file
+file = await client.memory.create(
+    path="preferences/tone.md", purpose="writing style", content="Keep it casual."
+)
+
+# List files (summaries — no content)
+for f in await client.memory.list():
+    print(f.path, f.purpose, f.version)
+
+# Read one file's content
+file = await client.memory.get("preferences/tone.md")
+
+# Partial update — only the fields you pass change. `version` guards against
+# overwriting a concurrent change: pass back the value from your last read,
+# and a stale one raises ConflictError (409).
+file = await client.memory.update(
+    "preferences/tone.md", version=file.version, content="Keep it upbeat."
+)
+
+# Delete
+await client.memory.delete("preferences/tone.md")
+```
+
+`version` is an opaque token — never parse or compare it, just round-trip
+whatever the API last gave you.
+
 ## Examples
 
 Runnable scripts for each scenario live in [`examples/`](examples/):

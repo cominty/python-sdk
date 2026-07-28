@@ -38,6 +38,12 @@ from .models.chat import (
     ThreadSummary,
     UpdateThreadParams,
 )
+from .models.memory import (
+    MemoryFileCreate,
+    MemoryFileOut,
+    MemoryFileSummaryOut,
+    MemoryFileUpdate,
+)
 from .streaming import AssistantRun, StartedChat
 
 try:
@@ -81,4 +87,8 @@ __all__ = [
     "Thread",
     "ThreadSummary",
     "UpdateThreadParams",
+    "MemoryFileCreate",
+    "MemoryFileOut",
+    "MemoryFileSummaryOut",
+    "MemoryFileUpdate",
 ]
