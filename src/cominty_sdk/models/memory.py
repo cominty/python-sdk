@@ -22,17 +22,14 @@ class MemoryFileCreate(BaseModel):
     content: str
     user_id: UserId
     """Unlike the other memory endpoints, ``POST /memory`` takes ``user_id`` in
-    the request body rather than as a query parameter — confirmed empirically,
-    the OpenAPI contract doesn't declare it as a parameter here at all."""
+    the request body rather than as a query parameter."""
 
 
 class MemoryFileUpdate(BaseModel):
     """Partial update body for ``PUT /memory/file``.
 
-    Built by the resource from only the arguments the caller actually passed,
-    then dumped with ``exclude_unset=True`` — this is what lets an explicit
-    ``None`` (clear the field) round-trip differently from an omitted argument
-    (leave the field untouched), which plain ``exclude_none`` cannot do.
+    Dumped with ``exclude_unset=True`` so an explicit ``None`` (clear the
+    field) round-trips differently from an omitted argument (leave untouched).
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -56,9 +53,8 @@ class MemoryFileOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     version: str
-    """Opaque concurrency token (currently identical to ``updated_at``) — pass
-    it back unchanged to :meth:`~.resources.memory.MemoryResource.update`.
-    Never parse, compare, or otherwise interpret its contents."""
+    """Opaque concurrency token — pass it back unchanged to
+    :meth:`~.resources.memory.MemoryResource.update`."""
 
 
 class MemoryFileSummaryOut(BaseModel):

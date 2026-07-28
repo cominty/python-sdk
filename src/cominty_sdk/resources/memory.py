@@ -21,12 +21,8 @@ __all__ = ["MemoryResource"]
 
 
 class _Unset:
-    """Sentinel default for :meth:`MemoryResource.update`'s optional fields.
-
-    Lets the method tell "argument not passed" (leave untouched) apart from
-    "argument passed as ``None``" (clear the field) — a plain ``None`` default
-    can't make that distinction.
-    """
+    """Sentinel default distinguishing "not passed" from "passed as ``None``"
+    for :meth:`MemoryResource.update`'s optional fields."""
 
     def __repr__(self) -> str:
         return "UNSET"
@@ -82,16 +78,10 @@ class MemoryResource:
     ) -> MemoryFileOut:
         """Update a memory file's content and/or purpose (``PUT /memory/file``).
 
-        ``version`` is the opaque token from a previously fetched
-        :class:`~.models.memory.MemoryFileOut` — round-tripped unchanged as a
-        query param. Raises :class:`~.exceptions.ConflictError` (409) if it no
-        longer matches the file's current version.
-
-        Only the fields you pass are sent: an omitted ``content``/``purpose``
-        leaves that field untouched server-side, while an explicit ``None``
-        clears it — the two are not equivalent. Omitting both raises
-        :class:`~.exceptions.InvalidParams` before any request is sent, since
-        that call would be a no-op.
+        Partial: only the fields you pass are sent, and an explicit ``None``
+        clears a field rather than leaving it untouched. ``version`` is the
+        opaque token from a previous read; a stale one raises
+        :class:`~.exceptions.ConflictError` (409).
         """
         fields: dict[str, object] = {}
         if not isinstance(content, _Unset):

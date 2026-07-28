@@ -2,7 +2,7 @@
 
 user_id is sourced from the client (set once at construction). Every memory
 endpoint takes it as a query param except POST /memory, which takes it in the
-request body instead — confirmed against the validated OpenAPI contract.
+request body instead.
 """
 
 from __future__ import annotations
@@ -176,8 +176,7 @@ async def test_update_no_fields_raises_invalid_params(
     with pytest.raises(InvalidParams):
         await client.memory.update("notes/todo.md", version="v1")
 
-    # Rejected client-side before any request is sent — a no-op PUT would just
-    # waste a round trip and silently mask a caller bug.
+    # Rejected client-side before any request is sent.
     assert mock_api.calls.call_count == 0
 
 
