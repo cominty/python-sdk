@@ -117,6 +117,62 @@ async def test_create_conflict_raises_conflict_error(
         )
 
 
+async def test_create_empty_content_is_allowed(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    # The API has no minimum-length constraint on content.
+    mock_api.post("/memory").mock(return_value=httpx.Response(201, json=_file(content="")))
+
+    result = await client.memory.create(path="notes/todo.md", purpose="scratch notes", content="")
+
+    assert result.content == ""
+
+
+# --------------------------------------------------------------------------- #
+# path folder-depth limit (create/get/update/delete)
+# --------------------------------------------------------------------------- #
+# Not in the OpenAPI spec — the live API rejects more than one folder segment
+# with a 422 ("Maximum folder depth is 1"). Checked locally in all 4 methods
+# that take a path, so it fails before a request, not after a round trip.
+TOO_DEEP_PATH = "a/b/c.md"
+
+
+async def test_create_path_too_deep_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    with pytest.raises(InvalidParams):
+        await client.memory.create(path=TOO_DEEP_PATH, purpose="x", content="y")
+
+    assert mock_api.calls.call_count == 0
+
+
+async def test_get_path_too_deep_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    with pytest.raises(InvalidParams):
+        await client.memory.get(TOO_DEEP_PATH)
+
+    assert mock_api.calls.call_count == 0
+
+
+async def test_update_path_too_deep_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    with pytest.raises(InvalidParams):
+        await client.memory.update(TOO_DEEP_PATH, version="v1", content="x")
+
+    assert mock_api.calls.call_count == 0
+
+
+async def test_delete_path_too_deep_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    with pytest.raises(InvalidParams):
+        await client.memory.delete(TOO_DEEP_PATH)
+
+    assert mock_api.calls.call_count == 0
+
+
 # --------------------------------------------------------------------------- #
 # get
 # --------------------------------------------------------------------------- #
@@ -159,15 +215,24 @@ async def test_update_omitted_field_is_excluded_from_body(
     assert result.version == "v2"
 
 
-async def test_update_explicit_none_clears_field(
-    client: AsyncCominty, mock_api: respx.MockRouter
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"purpose": None},
+        {"content": None},
+        {"content": "new content", "purpose": None},
+    ],
+)
+async def test_update_explicit_none_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter, kwargs: dict[str, object]
 ) -> None:
-    route = mock_api.put("/memory/file").mock(return_value=httpx.Response(200, json=_file()))
+    # The API silently ignores an explicit null (200, value unchanged) instead
+    # of clearing the field, so the SDK rejects it client-side rather than
+    # sending a request that looks like it succeeded but did nothing.
+    with pytest.raises(InvalidParams):
+        await client.memory.update("notes/todo.md", version="v1", **kwargs)
 
-    await client.memory.update("notes/todo.md", version="v1", purpose=None)
-
-    # An explicit None round-trips as a JSON null, distinct from being omitted.
-    assert json.loads(route.calls.last.request.content) == {"purpose": None}
+    assert mock_api.calls.call_count == 0
 
 
 async def test_update_no_fields_raises_invalid_params(

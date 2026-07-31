@@ -208,6 +208,18 @@ await client.memory.delete("preferences/tone.md")
 `version` is an opaque token — never parse or compare it, just round-trip
 whatever the API last gave you.
 
+There's currently no way to clear `content` or `purpose` once set — the API
+ignores an explicit `null` (leaves the existing value untouched), so
+`memory.update(..., content=None)` raises `InvalidParams` locally rather than
+sending a request that looks like it succeeded but did nothing.
+
+A few other things worth knowing:
+- `path` may have at most one folder segment — `"preferences/tone.md"` is
+  fine, `"a/b/tone.md"` isn't (raises `InvalidParams` locally).
+- `content` may be an empty string; there's no minimum length.
+- `memory.delete()` is not idempotent — deleting an already-deleted path
+  raises `NotFoundError`, not a repeated success.
+
 ## Examples
 
 Runnable scripts for each scenario live in [`examples/`](examples/):
