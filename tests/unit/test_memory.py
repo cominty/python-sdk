@@ -23,6 +23,10 @@ from cominty_sdk import (
 
 USER_ID = "user_31HPTBuBvX20xlQNAbvxjOxPbKB"
 
+# The live API rejects a path with more than one folder segment (422 "Maximum
+# folder depth is 1").
+TOO_DEEP_PATH = "a/b/c.md"
+
 
 def _file(
     path: str = "notes/todo.md",
@@ -88,8 +92,6 @@ async def test_create_sends_user_id_in_body_not_query(
 
     request = route.calls.last.request
     assert request.method == "POST"
-    # user_id belongs in the body here — every other memory endpoint puts it
-    # in the query string instead.
     assert "user_id" not in request.url.params
     body = json.loads(request.content)
     assert body == {
@@ -128,47 +130,11 @@ async def test_create_empty_content_is_allowed(
     assert result.content == ""
 
 
-# --------------------------------------------------------------------------- #
-# path folder-depth limit (create/get/update/delete)
-# --------------------------------------------------------------------------- #
-# Not in the OpenAPI spec — the live API rejects more than one folder segment
-# with a 422 ("Maximum folder depth is 1"). Checked locally in all 4 methods
-# that take a path, so it fails before a request, not after a round trip.
-TOO_DEEP_PATH = "a/b/c.md"
-
-
 async def test_create_path_too_deep_raises_invalid_params(
     client: AsyncCominty, mock_api: respx.MockRouter
 ) -> None:
     with pytest.raises(InvalidParams):
         await client.memory.create(path=TOO_DEEP_PATH, purpose="x", content="y")
-
-    assert mock_api.calls.call_count == 0
-
-
-async def test_get_path_too_deep_raises_invalid_params(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
-    with pytest.raises(InvalidParams):
-        await client.memory.get(TOO_DEEP_PATH)
-
-    assert mock_api.calls.call_count == 0
-
-
-async def test_update_path_too_deep_raises_invalid_params(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
-    with pytest.raises(InvalidParams):
-        await client.memory.update(TOO_DEEP_PATH, version="v1", content="x")
-
-    assert mock_api.calls.call_count == 0
-
-
-async def test_delete_path_too_deep_raises_invalid_params(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
-    with pytest.raises(InvalidParams):
-        await client.memory.delete(TOO_DEEP_PATH)
 
     assert mock_api.calls.call_count == 0
 
@@ -192,6 +158,15 @@ async def test_get_sends_path_and_user_id_as_query(
     assert result.content == "buy milk"
 
 
+async def test_get_path_too_deep_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    with pytest.raises(InvalidParams):
+        await client.memory.get(TOO_DEEP_PATH)
+
+    assert mock_api.calls.call_count == 0
+
+
 # --------------------------------------------------------------------------- #
 # update
 # --------------------------------------------------------------------------- #
@@ -205,7 +180,6 @@ async def test_update_omitted_field_is_excluded_from_body(
     result = await client.memory.update("notes/todo.md", version="v1", content="new content")
 
     request = route.calls.last.request
-    # purpose was never passed -> excluded entirely, not sent as null.
     assert json.loads(request.content) == {"content": "new content"}
     params = request.url.params
     assert params["path"] == "notes/todo.md"
@@ -241,7 +215,6 @@ async def test_update_no_fields_raises_invalid_params(
     with pytest.raises(InvalidParams):
         await client.memory.update("notes/todo.md", version="v1")
 
-    # Rejected client-side before any request is sent.
     assert mock_api.calls.call_count == 0
 
 
@@ -267,6 +240,15 @@ async def test_update_conflict_raises_conflict_error(
         await client.memory.update("notes/todo.md", version="stale", content="x")
 
 
+async def test_update_path_too_deep_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    with pytest.raises(InvalidParams):
+        await client.memory.update(TOO_DEEP_PATH, version="v1", content="x")
+
+    assert mock_api.calls.call_count == 0
+
+
 # --------------------------------------------------------------------------- #
 # delete
 # --------------------------------------------------------------------------- #
@@ -282,6 +264,15 @@ async def test_delete_sends_query_and_returns_none(
     assert request.method == "DELETE"
     assert request.url.params["path"] == "notes/todo.md"
     assert request.url.params["user_id"] == USER_ID
+
+
+async def test_delete_path_too_deep_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    with pytest.raises(InvalidParams):
+        await client.memory.delete(TOO_DEEP_PATH)
+
+    assert mock_api.calls.call_count == 0
 
 
 # --------------------------------------------------------------------------- #

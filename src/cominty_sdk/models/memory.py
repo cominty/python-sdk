@@ -18,10 +18,9 @@ __all__ = [
     "validate_memory_path",
 ]
 
-# Not in the OpenAPI spec — found by manually exercising the live API: a path
-# with more than one folder segment (e.g. "a/b/file.md") is rejected with a
-# 422 "Maximum folder depth is 1". Checked locally so a too-deep path fails
-# before a request, not after a round trip.
+
+# A path with more than one folder segment (e.g. "a/b/file.md") is rejected with a
+# 422 "Maximum folder depth is 1".
 _MAX_PATH_DEPTH = 1
 
 
