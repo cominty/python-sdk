@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (409) on a stale value — a malformed `version` raises `APIError` (422)
   instead. `delete()` is not idempotent: deleting an already-deleted path
   raises `NotFoundError` (404). See `examples/09_memory.py`.
+- `uv run invoke release --patch|--minor|--major|--version X.Y.Z` — a dev-only
+  task that bumps `pyproject.toml`, regenerates `uv.lock`, runs the lint/
+  type-check/test/build gate, then creates one release commit and one
+  annotated `vX.Y.Z` tag. Never pushes or creates the GitHub Release; prints
+  the exact next commands instead. See `AGENTS.md` §12.3.
 
 ### Changed
 - `__version__` is now resolved at runtime from installed package metadata

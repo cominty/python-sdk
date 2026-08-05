@@ -324,14 +324,28 @@ See [AGENTS.md](AGENTS.md) for coding conventions (typing, versioning, models).
 Publishing to PyPI uses **Trusted Publishing (OIDC)** — no tokens stored in
 GitHub — and is triggered by publishing a **GitHub Release**
 (`.github/workflows/release.yml`). The published version comes from
-`pyproject.toml`, so the tag is cosmetic; keep them in sync.
+`pyproject.toml`.
+
+**`uv run invoke release` modifies repository files and CREATES A GIT COMMIT
+AND TAG.** It bumps `pyproject.toml`, regenerates `uv.lock`, runs the lint /
+type-check / test / build gate, then commits and tags — it never pushes and
+never creates the GitHub Release itself.
 
 ```bash
-# 1. bump the version in pyproject.toml
-# 2. commit on main and push
-# 3. create the release — this tags and triggers the publish
-gh release create v0.4.0 --title "v0.4.0" --generate-notes
-#    pre-release rehearsal: gh release create v0.4.0rc1 --prerelease --generate-notes
+# 1. bump, validate, commit, and tag locally — pick exactly one
+uv run invoke release --patch            # X.Y.Z -> X.Y.(Z+1)
+uv run invoke release --minor            # X.Y.Z -> X.(Y+1).0
+uv run invoke release --major            # X.Y.Z -> (X+1).0.0
+uv run invoke release --version X.Y.Z    # set an explicit version
+
+# 2. push the commit and the tag it just created
+git push origin HEAD
+git push origin vX.Y.Z
+
+# 3. create the release — this triggers the publish workflow
+gh release create vX.Y.Z --title vX.Y.Z --generate-notes
+#    pre-release rehearsal (skips `invoke release`): tag and push manually,
+#    then gh release create vX.Y.Zrc1 --prerelease --generate-notes
 ```
 
 A local rehearsal to TestPyPI is available via `uv run invoke publish-test`.
