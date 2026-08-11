@@ -33,5 +33,10 @@ jobs:
       - name: Pyright
         run: uv run pyright
 
-      - name: Pytest
-        run: uv run pytest
+      - name: Pytest with coverage
+        run: >
+          uv run pytest --cov --cov-report=term-missing --cov-fail-under=100
+
+      - name: Coverage summary
+        if: always()
+        run: uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"

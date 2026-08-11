@@ -69,7 +69,9 @@ class AssistantRun:
 
     async def _stream(self) -> AsyncGenerator[AnyEvent]:
         if self._consumed:
-            raise SDKError("this AssistantRun stream has already been consumed")
+            # __aiter__ memoizes self._gen, so this never re-fires through the
+            # public API — a defensive guard against calling this method directly.
+            raise SDKError("this AssistantRun stream has already been consumed")  # pragma: no cover
         self._consumed = True
 
         headers: dict[str, str] = {}
