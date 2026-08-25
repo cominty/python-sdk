@@ -10,6 +10,7 @@ from ._config import Config
 from ._transport import AsyncTransport
 from .models.chat import validate_user_id
 from .resources.chat import ChatResource
+from .resources.memory import MemoryResource
 from .resources.threads import ThreadsResource
 
 __all__ = ["AsyncCominty"]
@@ -53,6 +54,7 @@ class AsyncCominty:
         self._transport = AsyncTransport(self._config)
         self.chat = ChatResource(self._transport, user_id=self._config.user_id)
         self.threads = ThreadsResource(self._transport, user_id=self._config.user_id)
+        self.memory = MemoryResource(self._transport, user_id=self._config.user_id)
 
     @property
     def user_id(self) -> str:

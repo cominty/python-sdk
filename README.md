@@ -176,6 +176,50 @@ await client.threads.update(thread_id, name="Renamed", starred=True)
 await client.threads.archive(thread_id)
 ```
 
+### Memory files
+
+`client.memory` stores per-user files an agent can read back later — scoped to
+the client's `user_id` automatically.
+
+```python
+# Create a file
+file = await client.memory.create(
+    path="preferences/tone.md", purpose="writing style", content="Keep it casual."
+)
+
+# List files (summaries — no content)
+for f in await client.memory.list():
+    print(f.path, f.purpose, f.version)
+
+# Read one file's content
+file = await client.memory.get("preferences/tone.md")
+
+# Partial update — only the fields you pass change. `version` guards against
+# overwriting a concurrent change: pass back the value from your last read,
+# and a stale one raises ConflictError (409).
+file = await client.memory.update(
+    "preferences/tone.md", version=file.version, content="Keep it upbeat."
+)
+
+# Delete
+await client.memory.delete("preferences/tone.md")
+```
+
+`version` is an opaque token — never parse or compare it, just round-trip
+whatever the API last gave you.
+
+There's currently no way to clear `content` or `purpose` once set — the API
+ignores an explicit `null` (leaves the existing value untouched), so
+`memory.update(..., content=None)` raises `InvalidParams` locally rather than
+sending a request that looks like it succeeded but did nothing.
+
+A few other things worth knowing:
+- `path` may have at most one folder segment — `"preferences/tone.md"` is
+  fine, `"a/b/tone.md"` isn't (raises `InvalidParams` locally).
+- `content` may be an empty string; there's no minimum length.
+- `memory.delete()` is not idempotent — deleting an already-deleted path
+  raises `NotFoundError`, not a repeated success.
+
 ## Examples
 
 Runnable scripts for each scenario live in [`examples/`](examples/):
