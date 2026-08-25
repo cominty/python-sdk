@@ -350,6 +350,22 @@ No `MagicMock` on the resource classes themselves — test the real resource, fa
 @pytest.mark.integration  # skipped in CI unless COMINTY_API_KEY is set
 ```
 
+### 9.5 Coverage
+
+`pytest-cov` measures statement and branch coverage of `src/cominty_sdk`, configured in
+`pyproject.toml`'s `[tool.coverage.*]` tables.
+
+```bash
+uv run pytest --cov --cov-report=term-missing   # coverage summary + missing lines
+uv run coverage html && open htmlcov/index.html  # annotated per-line HTML report
+```
+
+CI runs the same suite with `--cov-fail-under=100` and fails the build on any regression. An
+excluded line or branch must carry a `# pragma: no cover` **and** a one-line comment saying
+why it can't be reached through the public API — see `streaming.py`'s `_stream()` guard or
+`resources/memory.py`'s `_Unset.__repr__` for examples. Don't add tests that only exist to
+nudge the percentage; prefer a justified exclusion for genuinely unreachable code.
+
 ---
 
 ## 10. Commit & PR Discipline

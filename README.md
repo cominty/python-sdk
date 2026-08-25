@@ -311,6 +311,13 @@ uv run ruff check .    # lint
 uv run pyright         # type-check (strict)
 ```
 
+Coverage (statements + branches) is measured with `pytest-cov`; CI fails under
+100%:
+
+```bash
+uv run pytest --cov --cov-report=term-missing
+```
+
 Integration tests are opt-in (they hit the real API):
 
 ```bash

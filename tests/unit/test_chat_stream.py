@@ -18,6 +18,7 @@ import pytest
 import respx
 
 from cominty_sdk import (
+    AssistantRun,
     AsyncCominty,
     NotFoundError,
     SDKError,
@@ -390,6 +391,65 @@ def test_bare_stream_primitive_has_no_thread(
     run = client.chat.stream(UUID(ids.assistant_msg))
     assert run.thread is None
     assert run.message_id == UUID(ids.assistant_msg)
+
+
+async def test_aiter_called_twice_reuses_same_generator(
+    client: AsyncCominty,
+    mock_api: respx.MockRouter,
+    jsonl: Jsonl,
+    make_message: MakeMessage,
+    ids: SimpleNamespace,
+) -> None:
+    body = jsonl(make_message(id=ids.assistant_msg, role="assistant", content="final"))
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(
+        return_value=httpx.Response(200, text=body)
+    )
+
+    run = client.chat.stream(UUID(ids.assistant_msg))
+    first = run.__aiter__()
+    second = run.__aiter__()
+
+    assert first is second
+
+
+async def test_resume_sends_last_event_id_header(
+    client: AsyncCominty,
+    mock_api: respx.MockRouter,
+    jsonl: Jsonl,
+    make_message: MakeMessage,
+    ids: SimpleNamespace,
+) -> None:
+    body = jsonl(make_message(id=ids.assistant_msg, role="assistant", content="final"))
+    route = mock_api.get(_stream_path(ids.assistant_msg)).mock(
+        return_value=httpx.Response(200, text=body)
+    )
+
+    run = AssistantRun(
+        client._transport,  # noqa: SLF001
+        UUID(ids.assistant_msg),
+        last_event_id="1782676050530-0",
+    )
+    async for _ in run:
+        pass
+
+    assert route.calls.last.request.headers["last-event-id"] == "1782676050530-0"
+
+
+async def test_empty_stream_result_raises_sdk_error(
+    client: AsyncCominty, mock_api: respx.MockRouter, ids: SimpleNamespace
+) -> None:
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=""))
+
+    run = client.chat.stream(UUID(ids.assistant_msg))
+    with pytest.raises(SDKError):
+        await run.result()
+
+
+async def test_aclose_without_iteration_is_a_noop(
+    client: AsyncCominty, ids: SimpleNamespace
+) -> None:
+    run = client.chat.stream(UUID(ids.assistant_msg))
+    await run.aclose()  # never iterated — nothing to close
 
 
 async def test_context_manager_closes_cleanly(

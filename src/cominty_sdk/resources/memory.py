@@ -25,7 +25,7 @@ class _Unset:
     """Sentinel default distinguishing "not passed" from "passed as ``None``"
     for :meth:`MemoryResource.update`'s optional fields."""
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover - debug display only, never returned to callers
         return "UNSET"
 
 
