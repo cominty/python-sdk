@@ -400,6 +400,7 @@ uv run invoke clean            # remove dist/ build/ *.egg-info (no stale artifa
 uv run invoke build            # clean, then `uv build` -> sdist + wheel in dist/
 uv run invoke check            # build, `twine check dist/*`, and print sdist + wheel contents
 uv run invoke publish-test     # check, then upload to TestPyPI (rehearsal — never PyPI)
+uv run invoke release --patch  # bump + validate + commit + tag (see §12.3) — modifies Git state
 ```
 
 `check` is the gate to run before cutting a release. It confirms:
@@ -414,14 +415,33 @@ uv run invoke publish-test     # check, then upload to TestPyPI (rehearsal — n
 
 ### 12.3 Cutting a release (steps)
 
-1. **Bump the version** in `pyproject.toml`'s `[project] version` (the only place — see §12.1).
-2. **Verify locally**: `uv run invoke check` (and `uv run invoke publish-test` for a dry run).
-3. **Commit + tag**: `git commit -am "Release X.Y.Z"` then `git tag vX.Y.Z`; push both.
-   The tag `vX.Y.Z` must equal `pyproject.toml`'s version — the build derives the version from
-   that file, **not** the tag.
-4. **Publish via a GitHub Release** — create/publish a Release for tag `vX.Y.Z`
-   (`gh release create vX.Y.Z` or the GitHub UI). Publishing the Release is what triggers
-   the `release` workflow; a plain tag push does not.
+> **`uv run invoke release` modifies repository files and CREATES A GIT COMMIT AND TAG.**
+> It never pushes and never creates the GitHub Release — that's step 2 below, always manual.
+
+1. **Bump, validate, commit, and tag** — pick exactly one mode:
+
+   ```bash
+   uv run invoke release --patch            # X.Y.Z -> X.Y.(Z+1)
+   uv run invoke release --minor            # X.Y.Z -> X.(Y+1).0
+   uv run invoke release --major            # X.Y.Z -> (X+1).0.0
+   uv run invoke release --version X.Y.Z    # explicit target instead of incrementing
+   ```
+
+   The task (`tasks.py`): rejects zero or more than one of the four flags; requires a clean
+   working tree, a target version strictly greater than the current one, and no pre-existing
+   `vX.Y.Z` tag — all checked **before** touching any file. It then bumps `pyproject.toml`'s
+   `[project] version` (the only place — see §12.1), regenerates `uv.lock` via `uv lock`, and
+   runs the same lint/type-check/test/build gate as `uv run invoke check`. If any of that
+   fails, the file changes are rolled back and nothing is committed. On success it creates one
+   commit (`chore(release): version X.Y.Z`) and one **annotated** tag (`vX.Y.Z`), and prints
+   the exact next commands — it does not run them for you.
+2. **Push, then publish via a GitHub Release** — `git push origin HEAD && git push origin
+   vX.Y.Z`, then create/publish a Release for that tag (`gh release create vX.Y.Z
+   --generate-notes` or the GitHub UI). Publishing the Release is what triggers the `release`
+   workflow; a plain tag push does not.
+
+`tests/test_release.py` covers the task itself (patch/minor/major/explicit-version success,
+plus every validation failure) against disposable temp Git repos — never this repository.
 
 `uv run invoke publish` (direct upload to real PyPI) exists as a manual fallback only. The
 **preferred** path is the GitHub Release → CI flow below, so no PyPI token lives on a laptop.

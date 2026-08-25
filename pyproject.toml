@@ -48,6 +48,7 @@ dev = [
     "invoke>=2.2",
     "twine>=5",
     "rich>=13",  # examples/ pretty terminal output (not a runtime dependency)
+    "packaging>=23",  # tasks.py release: PEP 440 / SemVer version parsing
 ]
 
 [build-system]
@@ -64,6 +65,7 @@ only-include = ["src/cominty_sdk", "README.md", "pyproject.toml"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+pythonpath = ["."]  # so tests/test_release.py can `import tasks` (repo-root script)
 markers = [
     "integration: opt-in tests requiring COMINTY_API_KEY",
 ]
