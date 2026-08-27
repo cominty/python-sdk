@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `client.chat.cancel(message_id)` — cancel an in-flight assistant message
+  (`POST /chat/messages/{id}/cancel`). Returns the updated `Message`, with
+  `status` set to `cancelled`.
+
 ### Changed
 - `__version__` is now resolved at runtime from installed package metadata
   (`importlib.metadata.version("cominty-sdk")`) instead of the removed

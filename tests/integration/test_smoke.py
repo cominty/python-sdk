@@ -52,3 +52,12 @@ async def test_start_and_get_reply(creds: tuple[str, str], agent_id: str) -> Non
         reply = await run.result()
         assert reply.content
         assert str(reply.thread_id) == str(run.thread.id)
+
+
+@pytest.mark.asyncio
+async def test_cancel_message(creds: tuple[str, str], agent_id: str) -> None:
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        run = await client.chat.start(agent_id=agent_id, message="Write a long story.")
+        cancelled = await client.chat.cancel(run.message_id)
+        assert cancelled.status.value == "cancelled"

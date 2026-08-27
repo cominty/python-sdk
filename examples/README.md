@@ -34,5 +34,6 @@ python examples/01_stream_events.py
 | [`06_manage_thread.py`](06_manage_thread.py) | Get, rename/star, and archive a thread |
 | [`07_custom_agent.py`](07_custom_agent.py) | Call a custom managed agent (needs `COMINTY_CUSTOM_AGENT_ID`) |
 | [`08_mcp_linear.py`](08_mcp_linear.py) | Custom agent pulls live context from the Linear MCP server |
+| [`09_cancel_message.py`](09_cancel_message.py) | Cancel an in-flight assistant message |
 
 > Shared client setup lives in [`_shared.py`](_shared.py).

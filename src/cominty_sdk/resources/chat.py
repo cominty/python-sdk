@@ -104,6 +104,17 @@ class ChatResource:
         """Stream an existing assistant message by id (no I/O until consumed)."""
         return AssistantRun(self._transport, _as_uuid(message_id))
 
+    async def cancel(self, message_id: str | UUID) -> Message:
+        """Cancel an in-flight assistant message (``POST /chat/messages/{id}/cancel``).
+
+        Returns the updated :class:`~.models.chat.Message`, with
+        ``status`` set to :attr:`~.models.chat.MessageStatus.cancelled`.
+        """
+        raw = await self._transport.request(
+            "POST", f"/chat/messages/{message_id}/cancel"
+        )
+        return Message.model_validate(raw)
+
     def _build_body(
         self,
         *,
