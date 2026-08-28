@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -114,6 +114,15 @@ class ChatResource:
             "POST", f"/chat/messages/{message_id}/cancel"
         )
         return Message.model_validate(raw)
+
+    async def export(
+        self, message_id: str | UUID, *, format: Literal["pdf", "docx"]
+    ) -> bytes:
+        return await self._transport.request_bytes(
+            "GET",
+            f"/chat/messages/{message_id}/export",
+            params={"format": format},
+        )
 
     def _build_body(
         self,

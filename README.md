@@ -153,6 +153,19 @@ reply = await client.chat.send(run.thread.id, agent_id=AGENT_ID, message="Tomorr
 print(await reply.text())
 ```
 
+### Cancel or export a message
+
+```python
+run = await client.chat.start(agent_id=AGENT_ID, message="Write a long story.")
+
+# Cancel a still-running message — returns the Message with status "cancelled"
+cancelled = await client.chat.cancel(run.message_id)
+
+# Export a finished message as a file (format is "pdf" or "docx")
+pdf_bytes = await client.chat.export(run.message_id, format="pdf")
+open("export.pdf", "wb").write(pdf_bytes)
+```
+
 ### Manage threads
 
 `client.threads` is scoped to the client's `user_id` automatically.

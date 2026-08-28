@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `client.chat.cancel(message_id)` — cancel an in-flight assistant message
   (`POST /chat/messages/{id}/cancel`). Returns the updated `Message`, with
   `status` set to `cancelled`.
+- `client.chat.export(message_id, format="pdf"|"docx")` — export a finished
+  message as a file (`GET /chat/messages/{id}/export`). Returns raw bytes.
 
 ### Changed
 - `__version__` is now resolved at runtime from installed package metadata
