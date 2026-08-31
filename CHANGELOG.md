@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `client.chat.cancel(message_id)` — cancel an in-flight assistant message
+  (`POST /chat/messages/{id}/cancel`). Returns the updated `Message`, with
+  `status` set to `cancelled`.
+- `client.chat.export(message_id, format="pdf"|"docx")` — export a finished
+  message as a file (`GET /chat/messages/{id}/export`). Returns raw bytes.
+- `client.chat.upload_file(content, filename=..., mimetype=...)` /
+  `client.chat.download_file(file_pid)` — upload a file (bytes or a path) for
+  use in `file_ids=[...]` on `chat.start`/`chat.send`, and download a
+  conversation file's content. `upload_file` orchestrates a presigned-upload
+  flow (`GET /chat/files/upload`, a direct upload to storage, then
+  `POST /chat/files` to confirm); `download_file` follows a presigned
+  download URL returned by `GET /chat/files/{file_pid}`. Neither ever sends
+  the Cominty API token to the storage backend.
+
 ### Changed
 - `__version__` is now resolved at runtime from installed package metadata
   (`importlib.metadata.version("cominty-sdk")`) instead of the removed

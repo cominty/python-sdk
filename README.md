@@ -153,6 +153,36 @@ reply = await client.chat.send(run.thread.id, agent_id=AGENT_ID, message="Tomorr
 print(await reply.text())
 ```
 
+### Cancel or export a message
+
+```python
+run = await client.chat.start(agent_id=AGENT_ID, message="Write a long story.")
+
+# Cancel a still-running message — returns the Message with status "cancelled"
+cancelled = await client.chat.cancel(run.message_id)
+
+# Export a finished message as a file (format is "pdf" or "docx")
+pdf_bytes = await client.chat.export(run.message_id, format="pdf")
+open("export.pdf", "wb").write(pdf_bytes)
+```
+
+### Upload and download files
+
+```python
+# Upload a file (path or raw bytes), then attach it to a message via file_ids
+uploaded = await client.chat.upload_file(
+    "notes.txt", filename="notes.txt", mimetype="text/plain"
+)
+
+run = await client.chat.start(
+    agent_id=AGENT_ID, message="Summarize this file.", file_ids=[uploaded.id]
+)
+
+# Download a file attached to a conversation
+content = await client.chat.download_file(uploaded.id)
+open("notes-downloaded.txt", "wb").write(content)
+```
+
 ### Manage threads
 
 `client.threads` is scoped to the client's `user_id` automatically.

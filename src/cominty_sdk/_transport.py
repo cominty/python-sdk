@@ -16,7 +16,7 @@ from typing import Any
 import httpx
 
 from ._config import Config
-from .exceptions import APIConnectionError, error_from_response
+from .exceptions import APIConnectionError, SDKError, error_from_response
 
 __all__ = ["AsyncTransport"]
 
@@ -59,6 +59,83 @@ class AsyncTransport:
                 response.status_code, _safe_json(response), response.headers
             )
         return _safe_json(response)
+
+    async def request_bytes(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, Any] | None = None,
+    ) -> bytes:
+        try:
+            response = await self._client.request(method, path, params=params)
+        except httpx.TimeoutException as exc:
+            raise APIConnectionError(f"Request to {path} timed out") from exc
+        except httpx.RequestError as exc:
+            raise APIConnectionError(f"Request to {path} failed: {exc}") from exc
+
+        if response.is_error:
+            raise error_from_response(
+                response.status_code, _safe_json(response), response.headers
+            )
+        return response.content
+
+    async def upload_to_presigned_url(
+        self,
+        url: str,
+        *,
+        fields: Mapping[str, Any],
+        filename: str,
+        content: bytes,
+        mimetype: str,
+    ) -> str:
+        """Upload file bytes to a presigned URL and return the resulting ETag.
+
+        This talks directly to the storage backend the ``url`` points to, not
+        the Cominty API — a fresh, unauthenticated client, so ``x-cominty-token``
+        is never sent to that third-party host.
+        """
+        try:
+            async with httpx.AsyncClient() as upload_client:
+                response = await upload_client.post(
+                    url,
+                    data=dict(fields),
+                    files={"file": (filename, content, mimetype)},
+                )
+        except httpx.TimeoutException as exc:
+            raise APIConnectionError(f"Upload to {url} timed out") from exc
+        except httpx.RequestError as exc:
+            raise APIConnectionError(f"Upload to {url} failed: {exc}") from exc
+
+        if response.is_error:
+            raise error_from_response(
+                response.status_code, _safe_json(response), response.headers
+            )
+        etag = response.headers.get("ETag")
+        if etag is None:
+            raise SDKError("upload succeeded but the storage backend returned no ETag header")
+        return etag.strip('"')
+
+    async def download_from_presigned_url(self, url: str) -> bytes:
+        """Download bytes from a presigned URL.
+
+        This talks directly to the storage backend the ``url`` points to, not
+        the Cominty API — a fresh, unauthenticated client, so ``x-cominty-token``
+        is never sent to that third-party host.
+        """
+        try:
+            async with httpx.AsyncClient() as download_client:
+                response = await download_client.get(url)
+        except httpx.TimeoutException as exc:
+            raise APIConnectionError(f"Download from {url} timed out") from exc
+        except httpx.RequestError as exc:
+            raise APIConnectionError(f"Download from {url} failed: {exc}") from exc
+
+        if response.is_error:
+            raise error_from_response(
+                response.status_code, _safe_json(response), response.headers
+            )
+        return response.content
 
     @asynccontextmanager
     async def stream_lines(

@@ -52,3 +52,39 @@ async def test_start_and_get_reply(creds: tuple[str, str], agent_id: str) -> Non
         reply = await run.result()
         assert reply.content
         assert str(reply.thread_id) == str(run.thread.id)
+
+
+@pytest.mark.asyncio
+async def test_cancel_message(creds: tuple[str, str], agent_id: str) -> None:
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        run = await client.chat.start(agent_id=agent_id, message="Write a long story.")
+        cancelled = await client.chat.cancel(run.message_id)
+        assert cancelled.status.value == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_export_message(creds: tuple[str, str], agent_id: str) -> None:
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        run = await client.chat.start(
+            agent_id=agent_id, message="Reply with exactly: pong"
+        )
+        reply = await run.result()
+        exported = await client.chat.export(reply.id, format="pdf")
+        assert isinstance(exported, bytes)
+        assert len(exported) > 0
+
+
+@pytest.mark.asyncio
+async def test_upload_and_download_file(creds: tuple[str, str]) -> None:
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        content = b"hello from the integration test"
+        uploaded = await client.chat.upload_file(
+            content, filename="smoke.txt", mimetype="text/plain"
+        )
+        assert uploaded.name == "smoke.txt"
+
+        downloaded = await client.chat.download_file(uploaded.id)
+        assert downloaded == content
