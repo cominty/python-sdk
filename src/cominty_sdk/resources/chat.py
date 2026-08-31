@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
@@ -9,7 +10,11 @@ from pydantic import ValidationError
 
 from ..exceptions import InvalidParams, SDKError
 from ..models.chat import (
+    ConversationFile,
     DisablableTool,
+    FileUploadConfirmation,
+    FileUploadPermission,
+    FileUploadRequest,
     Message,
     MessageRole,
     StartChatParams,
@@ -123,6 +128,59 @@ class ChatResource:
             f"/chat/messages/{message_id}/export",
             params={"format": format},
         )
+
+    async def upload_file(
+        self, content: bytes | str | Path, *, filename: str, mimetype: str
+    ) -> ConversationFile:
+        """Upload a file for later use in ``file_ids=[...]`` on :meth:`start`/:meth:`send`.
+
+        ``content`` is either raw bytes or a path to read them from.
+
+        Orchestrates the full flow: requests a presigned upload permission
+        (``GET /chat/files/upload``), uploads the content directly to the
+        returned storage URL, then confirms the upload with Cominty
+        (``POST /chat/files``). Returns the registered file — its ``.id`` is
+        what feeds ``file_ids=[...]``.
+        """
+        if isinstance(content, (str, Path)):
+            content = Path(content).read_bytes()
+
+        try:
+            validated = FileUploadRequest(filename=filename, mimetype=mimetype)
+        except ValidationError as exc:
+            raise InvalidParams.from_validation_error(
+                exc, context="chat.upload_file"
+            ) from None
+
+        raw = await self._transport.request(
+            "GET",
+            "/chat/files/upload",
+            params={"filename": validated.filename, "mimetype": validated.mimetype},
+        )
+        permission = FileUploadPermission.model_validate(raw)
+
+        etag = await self._transport.upload_to_presigned_url(
+            permission.url,
+            fields=permission.fields,
+            filename=validated.filename,
+            content=content,
+            mimetype=validated.mimetype,
+        )
+
+        confirmation = FileUploadConfirmation(etag=etag, key=permission.fields["key"])
+        raw = await self._transport.request(
+            "POST", "/chat/files", json_body=confirmation.model_dump(mode="json")
+        )
+        return ConversationFile.model_validate(raw)
+
+    async def download_file(self, file_pid: str) -> bytes:
+        """Download a conversation file's content (``GET /chat/files/{file_pid}``).
+
+        The endpoint returns a short-lived presigned URL, not the file
+        content itself — this fetches from it and returns the raw bytes.
+        """
+        presigned_url = await self._transport.request("GET", f"/chat/files/{file_pid}")
+        return await self._transport.download_from_presigned_url(presigned_url)
 
     def _build_body(
         self,

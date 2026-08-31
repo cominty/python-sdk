@@ -31,10 +31,13 @@ __all__ = [
     "StartChatOptions",
     "StartChatParams",
     "UpdateThreadParams",
+    "FileUploadConfirmation",
+    "FileUploadRequest",
     # response models
     "Question",
     "Agent",
     "ShareLink",
+    "FileUploadPermission",
     "ConversationFile",
     "Message",
     "ThreadSummary",
@@ -148,6 +151,20 @@ class UpdateThreadParams(BaseModel):
     starred: bool | None = None
 
 
+class FileUploadConfirmation(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    etag: str
+    key: str
+
+
+class FileUploadRequest(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    filename: str = Field(max_length=255, pattern=r"^[^/]+$")
+    mimetype: str
+
+
 # --------------------------------------------------------------------------- #
 # Response models  (lenient — ignore unknown fields)
 # --------------------------------------------------------------------------- #
@@ -177,6 +194,13 @@ class ShareLink(BaseModel):
     expired: bool
     protected: bool
     url: str
+
+
+class FileUploadPermission(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    url: str
+    fields: dict[str, Any]
 
 
 class ConversationFile(BaseModel):

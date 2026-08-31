@@ -166,6 +166,23 @@ pdf_bytes = await client.chat.export(run.message_id, format="pdf")
 open("export.pdf", "wb").write(pdf_bytes)
 ```
 
+### Upload and download files
+
+```python
+# Upload a file (path or raw bytes), then attach it to a message via file_ids
+uploaded = await client.chat.upload_file(
+    "notes.txt", filename="notes.txt", mimetype="text/plain"
+)
+
+run = await client.chat.start(
+    agent_id=AGENT_ID, message="Summarize this file.", file_ids=[uploaded.id]
+)
+
+# Download a file attached to a conversation
+content = await client.chat.download_file(uploaded.id)
+open("notes-downloaded.txt", "wb").write(content)
+```
+
 ### Manage threads
 
 `client.threads` is scoped to the client's `user_id` automatically.

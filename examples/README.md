@@ -36,5 +36,6 @@ python examples/01_stream_events.py
 | [`08_mcp_linear.py`](08_mcp_linear.py) | Custom agent pulls live context from the Linear MCP server |
 | [`09_cancel_message.py`](09_cancel_message.py) | Cancel an in-flight assistant message |
 | [`10_export_message.py`](10_export_message.py) | Export a finished message as a PDF/DOCX file |
+| [`11_upload_download_files.py`](11_upload_download_files.py) | Upload a file, attach it to a message, download it back |
 
 > Shared client setup lives in [`_shared.py`](_shared.py).

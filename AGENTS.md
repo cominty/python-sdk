@@ -283,6 +283,14 @@ Use CRUD verbs: `create`, `get`, `list`, `update`, `delete`. Use domain verbs fo
 Prefer a typed `Params` model as the sole positional argument for complex inputs.
 Simple identifiers (e.g. `thread_id`) are keyword-only args, never inside a Params model.
 
+### 7.4 Third-party storage URLs
+
+Some endpoints hand back a presigned URL to a storage backend (S3, etc.) instead of, or in
+addition to, talking to the Cominty API directly — file upload/download, message export.
+Never reuse the client's main `httpx.AsyncClient` for that URL — it carries `x-cominty-token`
+as a default header, which must never reach a third-party host. Build a fresh, unauthenticated
+client instead. See `AsyncTransport.upload_to_presigned_url` / `download_from_presigned_url`.
+
 ---
 
 ## 8. Toolchain
