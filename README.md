@@ -176,6 +176,25 @@ await client.threads.update(thread_id, name="Renamed", starred=True)
 await client.threads.archive(thread_id)
 ```
 
+### Manage agents
+
+`client.agents` creates and updates custom agents with the same API key used for
+chat. Pass the returned `id` to `chat.start` as `agent_id`.
+
+```python
+models = await client.agents.list_models()
+agent = await client.agents.create(
+    name="Researcher",
+    instructions="Cite sources.",
+    scope="organization",
+    model_ids=[models[0].id],
+)
+await client.agents.update(agent.id, description="Org research helper")
+
+run = await client.chat.start(agent_id=agent.id, message="Summarize Q3.")
+print(await run.text())
+```
+
 ## Examples
 
 Runnable scripts for each scenario live in [`examples/`](examples/):

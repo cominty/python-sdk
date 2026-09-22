@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `client.agents` resource wrapping the public `/agents` API: `list`, `create`,
+  `get`, `update` (PATCH), `delete`, `list_models`, and `set_models`, with typed
+  `CustomAgent` / `CustomAgentSummary` / `LLMModelSummary` models (names chosen
+  to avoid colliding with the chat-thread `Agent`).
+
 ### Changed
 - `__version__` is now resolved at runtime from installed package metadata
   (`importlib.metadata.version("cominty-sdk")`) instead of the removed
