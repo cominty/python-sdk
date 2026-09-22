@@ -6,22 +6,24 @@ from typing import Annotated
 from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
 from typing_extensions import TypeAlias
 
-from .chat import UserId
-
 __all__ = [
     "MemoryFileCreate",
     "MemoryFileUpdate",
     "MemoryFileOut",
     "MemoryFileSummaryOut",
+    "MemoryFileQueryParams",
+    "MemoryNamespaceParam",
     "MemoryPath",
-    "MemoryPathParam",
+    "MemoryNamespace",
     "validate_memory_path",
+    "validate_memory_namespace",
 ]
 
 
 # A path with more than one folder segment (e.g. "a/b/file.md") is rejected with a
 # 422 "Maximum folder depth is 1".
 _MAX_PATH_DEPTH = 1
+_MAX_NAMESPACE_LENGTH = 128
 
 
 def validate_memory_path(value: str) -> str:
@@ -34,28 +36,47 @@ def validate_memory_path(value: str) -> str:
     return value
 
 
+def validate_memory_namespace(value: str) -> str:
+    if len(value) > _MAX_NAMESPACE_LENGTH:
+        raise ValueError(
+            f"namespace is {len(value)} characters long; the API allows at most "
+            f"{_MAX_NAMESPACE_LENGTH}"
+        )
+    return value
+
+
 MemoryPath: TypeAlias = Annotated[str, AfterValidator(validate_memory_path)]
 """A memory file path, folder-depth-checked before any request is sent."""
 
+MemoryNamespace: TypeAlias = Annotated[str, AfterValidator(validate_memory_namespace)]
+"""A caller-chosen bag name, at most 128 characters. Not trimmed: an empty or
+whitespace-only value is sent to the API exactly as given."""
 
-class MemoryPathParam(BaseModel):
-    """Validates a bare ``path`` argument (``get``/``update``/``delete``,
-    which don't otherwise go through a request-body model)."""
+
+class MemoryFileQueryParams(BaseModel):
+    """Validates the ``path`` + ``namespace`` pair shared by get/update/delete."""
 
     model_config = ConfigDict(strict=True)
 
     path: MemoryPath
+    namespace: MemoryNamespace
+
+
+class MemoryNamespaceParam(BaseModel):
+    """Validates a bare ``namespace`` argument, e.g. :meth:`list`'s optional filter."""
+
+    model_config = ConfigDict(strict=True)
+
+    namespace: MemoryNamespace
 
 
 class MemoryFileCreate(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     path: MemoryPath
+    namespace: MemoryNamespace
     purpose: str
     content: str
-    user_id: UserId
-    """Unlike the other memory endpoints, ``POST /memory`` takes ``user_id`` in
-    the request body rather than as a query parameter."""
 
 
 class MemoryFileUpdate(BaseModel):
@@ -97,6 +118,8 @@ class MemoryFileOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     path: str
+    namespace: str
+    """Logical bag name. Always the caller-chosen string, never prefixed."""
     purpose: str
     content: str
     created_at: datetime
@@ -110,6 +133,7 @@ class MemoryFileSummaryOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     path: str
+    namespace: str
     purpose: str
     created_at: datetime
     updated_at: datetime

@@ -62,7 +62,7 @@ class AsyncCominty:
         self._transport = AsyncTransport(self._config)
         self.chat = ChatResource(self._transport, user_id=self._config.user_id)
         self.threads = ThreadsResource(self._transport, user_id=self._config.user_id)
-        self.memory = MemoryResource(self._transport, user_id=self._config.user_id)
+        self.memory = MemoryResource(self._transport)
 
     @property
     def user_id(self) -> str:

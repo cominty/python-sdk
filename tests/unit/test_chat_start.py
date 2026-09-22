@@ -131,6 +131,38 @@ async def test_valid_disabled_tools_accepted(
     assert json.loads(route.calls.last.request.content)["message"]["disabled_tools"] == [tool]
 
 
+async def test_includes_memory_namespace_when_provided(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
+) -> None:
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
+
+    await client.chat.start(agent_id="agt_1", message="hi", memory_namespace="support-bot")
+
+    body = json.loads(route.calls.last.request.content)
+    assert body["options"]["memory_namespace"] == "support-bot"
+
+
+async def test_omits_memory_namespace_when_not_provided(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
+) -> None:
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
+
+    await client.chat.start(agent_id="agt_1", message="hi")
+
+    assert "memory_namespace" not in json.loads(route.calls.last.request.content)["options"]
+
+
+async def test_memory_namespace_too_long_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    route = mock_api.post("/chat")
+
+    with pytest.raises(InvalidParams):
+        await client.chat.start(agent_id="agt_1", message="hi", memory_namespace="x" * 129)
+
+    assert not route.called
+
+
 async def test_uses_configured_base_url(make_thread: MakeThread) -> None:
     with respx.mock(base_url="https://sandbox.test", assert_all_called=False) as router:
         route = router.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))

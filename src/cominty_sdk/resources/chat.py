@@ -36,6 +36,7 @@ class ChatResource:
         source_ids: list[int] | None = None,
         document_ids: list[str] | None = None,
         disabled_tools: list[DisablableTool] | None = None,
+        memory_namespace: str | None = None,
     ) -> StartedChat:
         """
         Start a new thread and return a handle on the assistant reply.
@@ -51,6 +52,9 @@ class ChatResource:
             source_ids (list[int] | None): Connected source ids attached to the message.
             document_ids (list[str] | None): Document ids attached to the message.
             disabled_tools (list[DisablableTool] | None): Tools the agent must not use.
+            memory_namespace (str | None): Memory bag for this thread, frozen for its
+                lifetime. Omit to run with no memory tools, unless the agent has its
+                own namespace set. A follow-up cannot change it.
 
         Returns:
             StartedChat: Handle for the in-progress assistant reply. ``thread`` is set.
@@ -66,6 +70,7 @@ class ChatResource:
             source_ids=source_ids,
             document_ids=document_ids,
             disabled_tools=disabled_tools,
+            memory_namespace=memory_namespace,
             context="chat.start",
         )
         raw = await self._transport.request("POST", "/chat", json_body=body)
@@ -90,7 +95,8 @@ class ChatResource:
         Sends ``POST /chat/{thread_id}``. The response is the new assistant
         message, not the whole thread, so the returned run has no ``thread``.
         Pass a suggested option, or free text, as ``message`` to answer an
-        agent question.
+        agent question. The thread's memory bag, if any, was fixed at
+        ``start``: a follow-up cannot change it.
 
         Args:
             thread_id (str | UUID): Thread to continue.
@@ -115,6 +121,7 @@ class ChatResource:
             source_ids=source_ids,
             document_ids=document_ids,
             disabled_tools=disabled_tools,
+            memory_namespace=None,
             context="chat.send",
         )
         raw = await self._transport.request("POST", f"/chat/{thread_id}", json_body=body)
@@ -145,6 +152,7 @@ class ChatResource:
         source_ids: list[int] | None,
         document_ids: list[str] | None,
         disabled_tools: list[DisablableTool] | None,
+        memory_namespace: str | None,
         context: str,
     ) -> dict[str, object]:
         # Validate the whole request in one pass so error locations are rooted
@@ -161,7 +169,11 @@ class ChatResource:
                         "document_ids": document_ids,
                         "disabled_tools": disabled_tools,
                     },
-                    "options": {"agent_id": agent_id, "user_id": self._user_id},
+                    "options": {
+                        "agent_id": agent_id,
+                        "user_id": self._user_id,
+                        "memory_namespace": memory_namespace,
+                    },
                 }
             )
         except ValidationError as exc:

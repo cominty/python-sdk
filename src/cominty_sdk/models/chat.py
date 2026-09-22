@@ -9,6 +9,8 @@ from uuid import UUID
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 from typing_extensions import TypeAlias
 
+from .memory import MemoryNamespace
+
 __all__ = [
     # enums / aliases
     "MessageRole",
@@ -116,6 +118,9 @@ class StartChatOptions(BaseModel):
     agent_id: str
     user_id: UserId
     """Required: the API-token endpoint rejects a missing ``user_id`` with 400."""
+    memory_namespace: MemoryNamespace | None = None
+    """Memory bag for this thread, frozen once the thread starts. Omit to run
+    with no memory tools, unless the agent has its own namespace set."""
 
 
 class StartChatParams(BaseModel):

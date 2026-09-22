@@ -178,31 +178,36 @@ await client.threads.archive(thread_id)
 
 ### Memory files
 
-`client.memory` stores per-user files an agent can read back later: scoped to
-the client's `user_id` automatically.
+`client.memory` stores files an agent can read back later, scoped to a
+**namespace**: a bag name you choose. There's no call to create a namespace;
+the first `create()` against a new name brings that bag into existence.
 
 ```python
-# Create a file
+# Create a file. namespace is required on every call below.
 file = await client.memory.create(
-    path="preferences/tone.md", purpose="writing style", content="Keep it casual."
+    path="tone.md", namespace="support-bot", purpose="writing style", content="Keep it casual."
 )
 
-# List files (summaries: no content)
-for f in await client.memory.list():
+# List files in one bag (summaries: no content). Omit namespace to list
+# every bag visible to this API key.
+for f in await client.memory.list(namespace="support-bot"):
     print(f.path, f.purpose, f.version)
 
+# List every namespace that already has at least one file.
+await client.memory.list_namespaces()
+
 # Read one file's content
-file = await client.memory.get("preferences/tone.md")
+file = await client.memory.get("tone.md", namespace="support-bot")
 
 # Partial update: only the fields you pass change. `version` guards against
 # overwriting a concurrent change: pass back the value from your last read,
 # and a stale one raises ConflictError (409).
 file = await client.memory.update(
-    "preferences/tone.md", version=file.version, content="Keep it upbeat."
+    "tone.md", namespace="support-bot", version=file.version, content="Keep it upbeat."
 )
 
 # Delete
-await client.memory.delete("preferences/tone.md")
+await client.memory.delete("tone.md", namespace="support-bot")
 ```
 
 `version` is an opaque token: never parse or compare it, just round-trip
@@ -214,11 +219,15 @@ ignores an explicit `null` (leaves the existing value untouched), so
 sending a request that looks like it succeeded but did nothing.
 
 A few other things worth knowing:
+- `namespace` may be at most 128 characters. It's never trimmed: an empty or
+  whitespace-only value is sent to the API exactly as given.
 - `path` may have at most one folder segment: `"preferences/tone.md"` is
   fine, `"a/b/tone.md"` isn't (raises `InvalidParams` locally).
 - `content` may be an empty string; there's no minimum length.
 - `memory.delete()` is not idempotent: deleting an already-deleted path
   raises `NotFoundError`, not a repeated success.
+- `chat.start(..., memory_namespace=...)` attaches a thread to a bag; the
+  bag is frozen once the thread starts (see [Message parameters](#message-parameters)).
 
 ## Examples
 
@@ -257,6 +266,7 @@ Both `chat.start` and `chat.send` accept:
 | `source_ids` | `list[int]` | Restrict retrieval to specific knowledge sources. |
 | `document_ids` | `list[str]` | Restrict retrieval to specific documents. |
 | `disabled_tools` | `list[str]` | Turn tools off: `"web"`, `"company_documents"`, `"mcp:<server>"`, or `"mcp:*"` for all MCP. |
+| `memory_namespace` | `str` | `start` only: the memory bag for this thread (max 128 chars), frozen for its lifetime. A follow-up cannot change it. |
 
 Invalid values raise `InvalidParams` **before** any request is sent.
 

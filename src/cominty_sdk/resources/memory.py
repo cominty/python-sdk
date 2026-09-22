@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Union
 
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from ..exceptions import InvalidParams
 from ..models.memory import (
     MemoryFileCreate,
     MemoryFileOut,
+    MemoryFileQueryParams,
     MemoryFileSummaryOut,
     MemoryFileUpdate,
-    MemoryPathParam,
+    MemoryNamespaceParam,
 )
 
 if TYPE_CHECKING:
@@ -26,42 +27,72 @@ __all__ = ["MemoryResource"]
 # typing.Sentinel would be the natural fit, but it's 3.13+, above the floor.
 _OptionalField = Union[str, None, "EllipsisType"]
 
+_namespaces_adapter: TypeAdapter[list[str]] = TypeAdapter(list[str])
+
 
 class MemoryResource:
-    def __init__(self, transport: AsyncTransport, *, user_id: str) -> None:
+    def __init__(self, transport: AsyncTransport) -> None:
         self._transport = transport
-        self._user_id = user_id
 
     @staticmethod
-    def _validate_path(path: str, *, context: str) -> str:
+    def _validate_query(path: str, namespace: str, *, context: str) -> tuple[str, str]:
         try:
-            return MemoryPathParam(path=path).path
+            validated = MemoryFileQueryParams(path=path, namespace=namespace)
         except ValidationError as exc:
             raise InvalidParams.from_validation_error(exc, context=context) from None
+        return validated.path, validated.namespace
 
-    async def list(self) -> list[MemoryFileSummaryOut]:
+    async def list(self, *, namespace: str | None = None) -> list[MemoryFileSummaryOut]:
         """
-        List the current user's memory files.
+        List memory files.
 
-        Sends ``GET /memory``. Summaries do not include file content.
+        Sends ``GET /memory``. Omit ``namespace`` to list every file visible
+        to this API key; pass one to filter to a single bag.
+
+        Args:
+            namespace (str | None): Bag to filter to. Omit to list every bag.
 
         Returns:
             list[MemoryFileSummaryOut]: One summary per file.
+
+        Raises:
+            InvalidParams: ``namespace`` is longer than 128 characters.
         """
-        raw = await self._transport.request("GET", "/memory", params={"user_id": self._user_id})
+        params: dict[str, object] = {}
+        if namespace is not None:
+            try:
+                params["namespace"] = MemoryNamespaceParam(namespace=namespace).namespace
+            except ValidationError as exc:
+                raise InvalidParams.from_validation_error(exc, context="memory.list") from None
+        raw = await self._transport.request("GET", "/memory", params=params)
         return [MemoryFileSummaryOut.model_validate(item) for item in raw]
 
-    async def create(self, *, path: str, purpose: str, content: str) -> MemoryFileOut:
+    async def list_namespaces(self) -> list[str]:
         """
-        Create a memory file.
+        List the distinct namespaces that already have files.
 
-        Sends ``POST /memory`` (201). ``user_id`` is sent in the body, unlike
-        the other memory calls, which send it as a query parameter. ``path``
-        may have at most one folder segment (``"folder/file.md"``). ``content``
-        may be empty.
+        Sends ``GET /memory/namespaces``. Read-only: there is no call to
+        create a namespace, since the first read or write against a name is
+        enough to bring that bag into existence.
+
+        Returns:
+            list[str]: Logical namespace names.
+        """
+        raw = await self._transport.request("GET", "/memory/namespaces")
+        return _namespaces_adapter.validate_python(raw)
+
+    async def create(
+        self, *, path: str, namespace: str, purpose: str, content: str
+    ) -> MemoryFileOut:
+        """
+        Create a memory file in a namespace.
+
+        Sends ``POST /memory`` (201). ``path`` may have at most one folder
+        segment (``"folder/file.md"``). ``content`` may be empty.
 
         Args:
             path (str): File path, at most one folder deep.
+            namespace (str): Bag this file belongs to, at most 128 characters.
             purpose (str): Why the file exists. The agent reads this.
             content (str): File body. An empty string is allowed.
 
@@ -69,12 +100,12 @@ class MemoryResource:
             MemoryFileOut: The created file, including its ``version`` token.
 
         Raises:
-            InvalidParams: ``path`` is deeper than one folder.
-            ConflictError: A file already exists at ``path``.
+            InvalidParams: ``path`` or ``namespace`` failed local validation.
+            ConflictError: A file already exists at ``path`` in ``namespace``.
         """
         try:
             params = MemoryFileCreate(
-                path=path, purpose=purpose, content=content, user_id=self._user_id
+                path=path, namespace=namespace, purpose=purpose, content=content
             )
         except ValidationError as exc:
             raise InvalidParams.from_validation_error(exc, context="memory.create") from None
@@ -83,7 +114,7 @@ class MemoryResource:
         )
         return MemoryFileOut.model_validate(raw)
 
-    async def get(self, path: str) -> MemoryFileOut:
+    async def get(self, path: str, *, namespace: str) -> MemoryFileOut:
         """
         Fetch one memory file, including its content.
 
@@ -91,17 +122,18 @@ class MemoryResource:
 
         Args:
             path (str): File path, at most one folder deep.
+            namespace (str): Bag this file belongs to.
 
         Returns:
             MemoryFileOut: The file, including ``content`` and ``version``.
 
         Raises:
-            InvalidParams: ``path`` is deeper than one folder.
-            NotFoundError: No file exists at ``path``.
+            InvalidParams: ``path`` or ``namespace`` failed local validation.
+            NotFoundError: No file exists at ``path`` in ``namespace``.
         """
-        path = self._validate_path(path, context="memory.get")
+        path, namespace = self._validate_query(path, namespace, context="memory.get")
         raw = await self._transport.request(
-            "GET", "/memory/file", params={"path": path, "user_id": self._user_id}
+            "GET", "/memory/file", params={"path": path, "namespace": namespace}
         )
         return MemoryFileOut.model_validate(raw)
 
@@ -109,6 +141,7 @@ class MemoryResource:
         self,
         path: str,
         *,
+        namespace: str,
         version: str,
         content: _OptionalField = ...,
         purpose: _OptionalField = ...,
@@ -122,6 +155,7 @@ class MemoryResource:
 
         Args:
             path (str): File path, at most one folder deep.
+            namespace (str): Bag this file belongs to.
             version (str): Opaque token from a previous read. Pass it back unchanged.
             content (str | None): New body. Omit the argument to leave it unchanged.
             purpose (str | None): New purpose. Omit the argument to leave it unchanged.
@@ -130,12 +164,12 @@ class MemoryResource:
             MemoryFileOut: The updated file, including the new ``version``.
 
         Raises:
-            InvalidParams: ``path`` is too deep, neither field was passed, or a
-                field was passed as ``None``.
+            InvalidParams: ``path``/``namespace`` failed local validation,
+                neither field was passed, or a field was passed as ``None``.
             ConflictError: ``version`` is well formed but stale.
             APIError: ``version`` is malformed (422).
         """
-        path = self._validate_path(path, context="memory.update")
+        path, namespace = self._validate_query(path, namespace, context="memory.update")
         fields: dict[str, object] = {}
         if content is not ...:
             fields["content"] = content
@@ -146,11 +180,11 @@ class MemoryResource:
         except ValidationError as exc:
             raise InvalidParams.from_validation_error(exc, context="memory.update") from None
         body = body_model.model_dump(mode="json", exclude_unset=True)
-        params = {"path": path, "version": version, "user_id": self._user_id}
+        params = {"path": path, "namespace": namespace, "version": version}
         raw = await self._transport.request("PUT", "/memory/file", params=params, json_body=body)
         return MemoryFileOut.model_validate(raw)
 
-    async def delete(self, path: str) -> None:
+    async def delete(self, path: str, *, namespace: str) -> None:
         """
         Delete a memory file.
 
@@ -159,15 +193,16 @@ class MemoryResource:
 
         Args:
             path (str): File path, at most one folder deep.
+            namespace (str): Bag this file belongs to.
 
         Returns:
             None: The file is deleted.
 
         Raises:
-            InvalidParams: ``path`` is deeper than one folder.
-            NotFoundError: The path does not exist.
+            InvalidParams: ``path`` or ``namespace`` failed local validation.
+            NotFoundError: The path does not exist in ``namespace``.
         """
-        path = self._validate_path(path, context="memory.delete")
+        path, namespace = self._validate_query(path, namespace, context="memory.delete")
         await self._transport.request(
-            "DELETE", "/memory/file", params={"path": path, "user_id": self._user_id}
+            "DELETE", "/memory/file", params={"path": path, "namespace": namespace}
         )

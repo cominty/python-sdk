@@ -8,10 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `client.memory`: full async CRUD for per-user memory files: `list()`,
-  `create()`, `get()`, `update()`, `delete()` (`GET/POST /memory`,
-  `GET/PUT/DELETE /memory/file`). New models `MemoryFileCreate`,
-  `MemoryFileUpdate`, `MemoryFileOut`, `MemoryFileSummaryOut`. `update()` is a
+- `client.memory`: full async CRUD for memory files, scoped to a
+  caller-chosen **namespace** (a bag name, at most 128 characters, never
+  trimmed): `list(namespace=None)`, `list_namespaces()`, `create()`, `get()`,
+  `update()`, `delete()` (`GET/POST /memory`, `GET /memory/namespaces`,
+  `GET/PUT/DELETE /memory/file`). `namespace` is required on `create()`,
+  `get()`, `update()`, and `delete()`; optional on `list()` (omit it to list
+  every bag). There is no call to create a namespace: the first `create()`
+  against a new name brings that bag into existence. New models
+  `MemoryFileCreate`, `MemoryFileUpdate`, `MemoryFileOut`,
+  `MemoryFileSummaryOut` (the last two now carry `namespace`). `update()` is a
   partial update: pass only the fields you want to change; the API does not
   support clearing `content`/`purpose` once set (a `null` is silently ignored
   server-side), so passing `content=None`/`purpose=None` raises
@@ -24,11 +30,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (409) on a stale value: a malformed `version` raises `APIError` (422)
   instead. `delete()` is not idempotent: deleting an already-deleted path
   raises `NotFoundError` (404). See `examples/09_memory.py`.
+- `chat.start(..., memory_namespace=...)`: attaches the new thread to a
+  memory bag, frozen for the thread's lifetime. Omit it to run with no
+  memory tools, unless the agent has its own namespace set. Not accepted on
+  `chat.send`: a follow-up cannot change a thread's namespace.
+- `uv run invoke code.format|code.check|code.test|code.all`: the day-to-day
+  dev loop (ruff format, ruff check + pyright, pytest with the same
+  `--cov-fail-under=100` floor as CI, or all three in order).
 - `uv run invoke release --patch|--minor|--major|--version X.Y.Z`: a dev-only
   task that bumps `pyproject.toml`, regenerates `uv.lock`, runs the lint/
   type-check/test/build gate, then creates one release commit and one
-  annotated `vX.Y.Z` tag. Never pushes or creates the GitHub Release; prints
-  the exact next commands instead. See `AGENTS.md` §12.3.
+  annotated `vX.Y.Z` tag. Prints a plan and asks for confirmation before
+  writing any file, and again before committing and tagging (`--yes` skips
+  both). Never pushes or creates the GitHub Release; prints the exact next
+  commands instead. See `AGENTS.md` §12.4.
 
 ### Changed
 - `__version__` is now resolved at runtime from installed package metadata
@@ -36,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `src/cominty_sdk/_version.py`. Falls back to `"unknown"` when the package
   isn't installed (e.g. a raw source checkout). The single source of truth
   for the version is now `pyproject.toml`'s `[project] version`.
+- `uv run invoke clean` now also removes tool caches (`__pycache__`,
+  `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, `.pyright`, `htmlcov`,
+  `.coverage*`), not just build artifacts.
+
+### Removed
+- `client.memory`'s methods no longer send `user_id`: memory files are
+  scoped by `namespace`, not by the end user.
 
 ## [0.1.1] - 2026-06-18
 

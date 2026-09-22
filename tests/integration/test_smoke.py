@@ -49,29 +49,35 @@ async def test_start_and_get_reply(creds: tuple[str, str], agent_id: str) -> Non
 async def test_memory_lifecycle(creds: tuple[str, str]) -> None:
     api_key, user_id = creds
     async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
-        path = f"sdk-integration-tests/{uuid4()}.md"
+        namespace = f"sdk-integration-tests-{uuid4()}"
+        path = "notes.md"
         created = await client.memory.create(
-            path=path, purpose="integration test", content="buy milk"
+            path=path, namespace=namespace, purpose="integration test", content="buy milk"
         )
         try:
             assert created.path == path
+            assert created.namespace == namespace
             assert created.content == "buy milk"
 
-            summaries = await client.memory.list()
+            summaries = await client.memory.list(namespace=namespace)
             assert any(f.path == path for f in summaries)
 
-            fetched = await client.memory.get(path)
+            assert namespace in await client.memory.list_namespaces()
+
+            fetched = await client.memory.get(path, namespace=namespace)
             assert fetched.content == "buy milk"
 
             updated = await client.memory.update(
-                path, version=fetched.version, content="buy oat milk"
+                path, namespace=namespace, version=fetched.version, content="buy oat milk"
             )
             assert updated.content == "buy oat milk"
 
             with pytest.raises(ConflictError):
-                await client.memory.update(path, version=fetched.version, content="stale write")
+                await client.memory.update(
+                    path, namespace=namespace, version=fetched.version, content="stale write"
+                )
         finally:
-            await client.memory.delete(path)
+            await client.memory.delete(path, namespace=namespace)
 
         with pytest.raises(NotFoundError):
-            await client.memory.get(path)
+            await client.memory.get(path, namespace=namespace)
