@@ -304,14 +304,23 @@ never to silence a real type error. Each ignore must have an inline comment expl
 
 ```toml
 [tool.ruff]
-target-version = "py313"
+target-version = "py39"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "TID252"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
 ```
 
 `ANN` (annotations) enforces that every public function is fully annotated.
+
+`TID252` with `ban-relative-imports = "parents"` allows only single-dot,
+same-package relative imports (`from .memory import MemoryFileOut` inside
+`models/`). Anything reaching into a parent package (`from ..exceptions
+import InvalidParams` from `resources/`) must be an absolute import instead
+(`from cominty_sdk.exceptions import InvalidParams`).
 
 ---
 

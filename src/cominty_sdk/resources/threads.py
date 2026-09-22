@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ..models.chat import Thread, ThreadSummary, UpdateThreadParams
+from cominty_sdk.models.chat import Thread, ThreadSummary, UpdateThreadParams
 
 if TYPE_CHECKING:
-    from .._transport import AsyncTransport
+    from cominty_sdk._transport import AsyncTransport
 
 __all__ = ["ThreadsResource"]
 

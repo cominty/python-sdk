@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING, Union
 
 from pydantic import TypeAdapter, ValidationError
 
-from ..exceptions import InvalidParams
-from ..models.memory import (
+from cominty_sdk.exceptions import InvalidParams
+from cominty_sdk.models.memory import (
     MemoryFileCreate,
     MemoryFileOut,
     MemoryFileQueryParams,
@@ -15,17 +15,15 @@ from ..models.memory import (
 )
 
 if TYPE_CHECKING:
-    # types.EllipsisType is 3.10+; this import is annotation-only so the
-    # future import keeps it from ever running on the 3.9 floor.
-    from types import EllipsisType
-
-    from .._transport import AsyncTransport
+    from cominty_sdk._transport import AsyncTransport
 
 __all__ = ["MemoryResource"]
 
 # Ellipsis distinguishes "argument omitted" from "passed as None" on update().
 # typing.Sentinel would be the natural fit, but it's 3.13+, above the floor.
-_OptionalField = Union[str, None, "EllipsisType"]
+# "ellipsis" (the type of `...`) is typeshed's synthesized name for it: no
+# import needed, and unlike types.EllipsisType it's available on Python 3.9.
+_OptionalField = Union[str, None, "ellipsis"]  # noqa: F821 - typeshed-only, not a real name
 
 _namespaces_adapter: TypeAdapter[list[str]] = TypeAdapter(list[str])
 

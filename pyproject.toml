@@ -77,7 +77,13 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "TID252"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Only single-dot, same-package relative imports (`from .foo import Bar`) are
+# allowed. Anything reaching into a parent package (`from ..foo import Bar`)
+# must be an absolute import instead.
+ban-relative-imports = "parents"
 
 [tool.ruff.lint.per-file-ignores]
 # Unshipped dev entrypoints (excluded from the sdist): manual endpoint-poking

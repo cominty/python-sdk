@@ -5,18 +5,18 @@ from uuid import UUID
 
 from pydantic import ValidationError
 
-from ..exceptions import InvalidParams, SDKError
-from ..models.chat import (
+from cominty_sdk.exceptions import InvalidParams, SDKError
+from cominty_sdk.models.chat import (
     DisablableTool,
     Message,
     MessageRole,
     StartChatParams,
     Thread,
 )
-from ..streaming import AssistantRun, StartedChat
+from cominty_sdk.streaming import AssistantRun, StartedChat
 
 if TYPE_CHECKING:
-    from .._transport import AsyncTransport
+    from cominty_sdk._transport import AsyncTransport
 
 __all__ = ["ChatResource"]
 
