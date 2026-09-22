@@ -39,9 +39,7 @@ async def test_list_threads(creds: tuple[str, str]) -> None:
 async def test_start_and_get_reply(creds: tuple[str, str], agent_id: str) -> None:
     api_key, user_id = creds
     async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
-        run = await client.chat.start(
-            agent_id=agent_id, message="Reply with exactly: pong"
-        )
+        run = await client.chat.start(agent_id=agent_id, message="Reply with exactly: pong")
         reply = await run.result()
         assert reply.content
         assert str(reply.thread_id) == str(run.thread.id)
@@ -71,9 +69,7 @@ async def test_memory_lifecycle(creds: tuple[str, str]) -> None:
             assert updated.content == "buy oat milk"
 
             with pytest.raises(ConflictError):
-                await client.memory.update(
-                    path, version=fetched.version, content="stale write"
-                )
+                await client.memory.update(path, version=fetched.version, content="stale write")
         finally:
             await client.memory.delete(path)
 

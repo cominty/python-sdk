@@ -74,7 +74,7 @@ def c() -> Context:
 def test_release_success(
     repo: Path, c: Context, capsys: pytest.CaptureFixture[str], kwargs: dict, expected: str
 ) -> None:
-    tasks.release(c, **kwargs)
+    tasks.release(c, yes=True, **kwargs)
 
     assert _pyproject_version() == expected
     assert f'version = "{expected}"' in (repo / "uv.lock").read_text()
@@ -150,4 +150,36 @@ def test_release_existing_tag_fails(repo: Path, c: Context) -> None:
     with pytest.raises(Exit):
         tasks.release(c, patch=True)
     assert _git_out("rev-parse", "HEAD") == before
+    assert _pyproject_version() == "0.1.0"
+
+
+# --------------------------------------------------------------------------- #
+# confirmation prompts
+# --------------------------------------------------------------------------- #
+def test_release_declined_first_confirmation_leaves_repo_untouched(
+    repo: Path, c: Context, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(tasks.Confirm, "ask", staticmethod(lambda *a, **k: False))
+    before = _git_out("rev-parse", "HEAD")
+
+    with pytest.raises(Exit):
+        tasks.release(c, patch=True)
+
+    assert _git_out("rev-parse", "HEAD") == before
+    assert _is_clean()
+    assert _pyproject_version() == "0.1.0"
+
+
+def test_release_declined_second_confirmation_rolls_back(
+    repo: Path, c: Context, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    answers = iter([True, False])
+    monkeypatch.setattr(tasks.Confirm, "ask", staticmethod(lambda *a, **k: next(answers)))
+    before = _git_out("rev-parse", "HEAD")
+
+    with pytest.raises(Exit):
+        tasks.release(c, patch=True)
+
+    assert _git_out("rev-parse", "HEAD") == before
+    assert _is_clean()
     assert _pyproject_version() == "0.1.0"

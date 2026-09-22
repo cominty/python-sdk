@@ -43,8 +43,7 @@ async def main() -> None:
         return
 
     async with make_client() as client:
-        pretty.panel(TECHNICAL_INPUT, title="Technical input (engineering, EN)",
-                     style="yellow")
+        pretty.panel(TECHNICAL_INPUT, title="Technical input (engineering, EN)", style="yellow")
 
         run = await client.chat.start(
             agent_id=CUSTOM_AGENT_ID,

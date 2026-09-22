@@ -48,7 +48,7 @@ dev = [
     "nbformat>=5",
     "invoke>=2.2",
     "twine>=5",
-    "rich>=13",  # examples/ pretty terminal output (not a runtime dependency)
+    "rich>=13",  # examples/ pretty output, tasks.py release confirmation prompts
     "packaging>=23",  # tasks.py release: PEP 440 / SemVer version parsing
 ]
 

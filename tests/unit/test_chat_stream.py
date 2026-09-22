@@ -79,9 +79,7 @@ async def test_iterates_events_only_terminal_not_yielded(
         make_event("result", id="3-0", correlation_id=3, data=_RESULT_DATA),
         make_message(id=ids.assistant_msg, role="assistant", content="final"),
     )
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     collected = [event async for event in run]
@@ -114,9 +112,7 @@ async def test_blank_heartbeat_line_skipped(
         make_event("result", id="1-0", data=_RESULT_DATA),
         make_message(id=ids.assistant_msg, role="assistant", content="final"),
     )
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     names = [e.name async for e in run]
@@ -136,9 +132,7 @@ async def test_unknown_event_is_forward_compatible(
         make_event("brand_new_event", id="0-0", status="running", data={"x": 1}),
         make_message(id=ids.assistant_msg, role="assistant", content="final"),
     )
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     collected = [event async for event in run]
@@ -161,9 +155,7 @@ async def test_tracks_last_event_id_for_resume(
         make_event("result", id="1782676050530-0", data=_RESULT_DATA),
         make_message(id=ids.assistant_msg, role="assistant", content="final"),
     )
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     async for _ in run:
@@ -187,9 +179,7 @@ async def test_result_returns_terminal_without_manual_iteration(
         make_event("result", id="1-0", data=_RESULT_DATA),
         make_message(id=ids.assistant_msg, role="assistant", content="final"),
     )
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     msg = await run.result()
@@ -208,9 +198,7 @@ async def test_text_returns_final_reply(
     ids: SimpleNamespace,
 ) -> None:
     body = jsonl(make_message(id=ids.assistant_msg, role="assistant", content="final"))
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     assert await run.text() == "final"
@@ -228,9 +216,7 @@ async def test_result_after_full_iteration_returns_terminal(
         make_event("result", id="1-0", data=_RESULT_DATA),
         make_message(id=ids.assistant_msg, role="assistant", content="final"),
     )
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     async for _ in run:
@@ -247,9 +233,7 @@ async def test_result_is_idempotent(
     ids: SimpleNamespace,
 ) -> None:
     body = jsonl(make_message(id=ids.assistant_msg, role="assistant", content="final"))
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     first = await run.result()
@@ -266,9 +250,7 @@ async def test_non_live_message_yields_no_events(
 ) -> None:
     # A finished message streams only its terminal snapshot, no progress events.
     body = jsonl(make_message(id=ids.assistant_msg, role="assistant", content="cached"))
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     collected = [event async for event in run]
@@ -293,9 +275,7 @@ async def test_partial_iteration_then_result_raises(
         make_event("result", id="1-0", data=_RESULT_DATA),
         make_message(id=ids.assistant_msg, role="assistant", content="final"),
     )
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     async for _ in run:
@@ -327,9 +307,7 @@ async def test_partial_raises_stream_interrupted_on_iteration(
         ),
     }
     body = jsonl(make_event("llm", id="0-0", data={"description": "x", "model": "y"}), partial)
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     with pytest.raises(StreamInterrupted) as exc:
@@ -378,9 +356,7 @@ async def test_stream_http_error_raises_on_iteration(
             pass
 
 
-def test_bare_stream_primitive_has_no_thread(
-    client: AsyncCominty, ids: SimpleNamespace
-) -> None:
+def test_bare_stream_primitive_has_no_thread(client: AsyncCominty, ids: SimpleNamespace) -> None:
     run = client.chat.stream(UUID(ids.assistant_msg))
     assert run.thread is None
     assert run.message_id == UUID(ids.assistant_msg)
@@ -394,9 +370,7 @@ async def test_aiter_called_twice_reuses_same_generator(
     ids: SimpleNamespace,
 ) -> None:
     body = jsonl(make_message(id=ids.assistant_msg, role="assistant", content="final"))
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     first = run.__aiter__()
@@ -453,9 +427,7 @@ async def test_context_manager_closes_cleanly(
     ids: SimpleNamespace,
 ) -> None:
     body = jsonl(make_message(id=ids.assistant_msg, role="assistant", content="final"))
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     async with client.chat.stream(UUID(ids.assistant_msg)) as run:
         events_seen = [e async for e in run]
@@ -479,9 +451,7 @@ async def test_start_then_stream_end_to_end(
         make_event("result", id="1-0", data=_RESULT_DATA),
         make_message(id=ids.assistant_msg, role="assistant", content="final"),
     )
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = await client.chat.start(agent_id="agt_1", message="hi")
     names = [e.name async for e in run]
@@ -509,9 +479,7 @@ async def test_questions_surfaced_from_terminal_message(
         ],
     }
     body = jsonl(make_event("result", id="1-0", data=_RESULT_DATA), terminal)
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     questions = await run.questions()
@@ -532,9 +500,7 @@ async def test_questions_empty_when_none(
         make_event("result", id="1-0", data=_RESULT_DATA),
         make_message(id=ids.assistant_msg, role="assistant", content="final"),
     )
-    mock_api.get(_stream_path(ids.assistant_msg)).mock(
-        return_value=httpx.Response(200, text=body)
-    )
+    mock_api.get(_stream_path(ids.assistant_msg)).mock(return_value=httpx.Response(200, text=body))
 
     run = client.chat.stream(UUID(ids.assistant_msg))
     assert await run.questions() == []

@@ -76,9 +76,7 @@ async def test_validation_fires_before_request(
     route = mock_api.post(f"/chat/{THREAD_ID}")
 
     with pytest.raises(InvalidParams) as exc:
-        await client.chat.send(
-            THREAD_ID, message="hi", agent_id="a", disabled_tools=["bogus"]
-        )
+        await client.chat.send(THREAD_ID, message="hi", agent_id="a", disabled_tools=["bogus"])
 
     assert not route.called
     assert str(exc.value).startswith("Invalid parameters for chat.send:")

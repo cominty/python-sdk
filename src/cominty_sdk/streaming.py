@@ -104,9 +104,7 @@ class AssistantRun:
         if self._terminal is not None:
             return self._terminal
         if self._consumed:
-            raise SDKError(
-                "stream was partially consumed; the final message is unavailable"
-            )
+            raise SDKError("stream was partially consumed; the final message is unavailable")
         async for _ in self:
             pass
         if self._terminal is None:

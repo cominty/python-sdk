@@ -117,9 +117,7 @@ class ChatResource:
             disabled_tools=disabled_tools,
             context="chat.send",
         )
-        raw = await self._transport.request(
-            "POST", f"/chat/{thread_id}", json_body=body
-        )
+        raw = await self._transport.request("POST", f"/chat/{thread_id}", json_body=body)
         reply = Message.model_validate(raw)
         return AssistantRun(self._transport, reply.id)
 

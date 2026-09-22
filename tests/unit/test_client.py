@@ -26,9 +26,7 @@ def test_explicit_user_id_beats_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.parametrize("bad", ["", "nope", "user_short", "31HPTBuBvX20xlQNAbvx" * 2])
-def test_malformed_user_id_rejected_locally(
-    bad: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_malformed_user_id_rejected_locally(bad: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("COMINTY_USER_ID", raising=False)
     with pytest.raises(ValueError):
         AsyncCominty(api_token="t", user_id=bad, base_url="https://x.test")

@@ -100,9 +100,7 @@ async def test_update_sends_only_provided_fields(
     assert thread.name == "Renamed"
 
 
-async def test_update_starred_only(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
+async def test_update_starred_only(client: AsyncCominty, mock_api: respx.MockRouter) -> None:
     route = mock_api.put(f"/chat/{THREAD_ID}").mock(
         return_value=httpx.Response(200, json={**_summary(), "starred": True})
     )
@@ -116,12 +114,8 @@ async def test_update_starred_only(
 # --------------------------------------------------------------------------- #
 # archive
 # --------------------------------------------------------------------------- #
-async def test_archive_sends_delete(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
-    route = mock_api.delete(f"/chat/{THREAD_ID}").mock(
-        return_value=httpx.Response(204)
-    )
+async def test_archive_sends_delete(client: AsyncCominty, mock_api: respx.MockRouter) -> None:
+    route = mock_api.delete(f"/chat/{THREAD_ID}").mock(return_value=httpx.Response(204))
 
     result = await client.threads.archive(THREAD_ID)
 

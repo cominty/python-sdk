@@ -75,9 +75,7 @@ async def test_list_scopes_to_client_user_id(
 async def test_create_sends_user_id_in_body_not_query(
     client: AsyncCominty, mock_api: respx.MockRouter
 ) -> None:
-    route = mock_api.post("/memory").mock(
-        return_value=httpx.Response(201, json=_file())
-    )
+    route = mock_api.post("/memory").mock(return_value=httpx.Response(201, json=_file()))
 
     result = await client.memory.create(
         path="notes/todo.md", purpose="scratch notes", content="buy milk"
@@ -138,9 +136,7 @@ async def test_create_path_too_deep_raises_invalid_params(
 async def test_get_sends_path_and_user_id_as_query(
     client: AsyncCominty, mock_api: respx.MockRouter
 ) -> None:
-    route = mock_api.get("/memory/file").mock(
-        return_value=httpx.Response(200, json=_file())
-    )
+    route = mock_api.get("/memory/file").mock(return_value=httpx.Response(200, json=_file()))
 
     result = await client.memory.get("notes/todo.md")
 
@@ -216,7 +212,7 @@ async def test_update_version_round_trips_unchanged(
 ) -> None:
     route = mock_api.put("/memory/file").mock(return_value=httpx.Response(200, json=_file()))
 
-    opaque_version = "W/\"2026-06-28T10:00:00Z-xyz\""
+    opaque_version = 'W/"2026-06-28T10:00:00Z-xyz"'
     await client.memory.update("notes/todo.md", version=opaque_version, content="x")
 
     assert route.calls.last.request.url.params["version"] == opaque_version
@@ -285,9 +281,7 @@ async def test_full_lifecycle(client: AsyncCominty, mock_api: respx.MockRouter) 
     )
     listed = await client.memory.list()
     fetched = await client.memory.get(created.path)
-    updated = await client.memory.update(
-        fetched.path, version=fetched.version, content="updated"
-    )
+    updated = await client.memory.update(fetched.path, version=fetched.version, content="updated")
     deleted = await client.memory.delete(updated.path)
 
     assert created.path == "notes/todo.md"

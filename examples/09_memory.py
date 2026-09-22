@@ -51,9 +51,7 @@ async def main() -> None:
 
             # Reusing the now-stale version demonstrates the 409 guard.
             try:
-                await client.memory.update(
-                    path, version=fetched.version, content="stale write"
-                )
+                await client.memory.update(path, version=fetched.version, content="stale write")
             except ConflictError:
                 pretty.console.print("  [bold]conflict[/] [yellow]stale version rejected[/]")
         finally:

@@ -35,18 +35,14 @@ class AsyncTransport:
         params: Mapping[str, Any] | None = None,
     ) -> Any:  # noqa: ANN401 - decoded JSON; resources validate into models
         try:
-            response = await self._client.request(
-                method, path, json=json_body, params=params
-            )
+            response = await self._client.request(method, path, json=json_body, params=params)
         except httpx.TimeoutException as exc:
             raise APIConnectionError(f"Request to {path} timed out") from exc
         except httpx.RequestError as exc:
             raise APIConnectionError(f"Request to {path} failed: {exc}") from exc
 
         if response.is_error:
-            raise error_from_response(
-                response.status_code, _safe_json(response), response.headers
-            )
+            raise error_from_response(response.status_code, _safe_json(response), response.headers)
         return _safe_json(response)
 
     @asynccontextmanager

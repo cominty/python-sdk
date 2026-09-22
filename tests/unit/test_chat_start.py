@@ -69,9 +69,7 @@ async def test_thread_is_non_optional_on_started_chat(
 async def test_sends_post_with_token_and_minimal_body(
     client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
 ) -> None:
-    route = mock_api.post("/chat").mock(
-        return_value=httpx.Response(200, json=make_thread())
-    )
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
 
     await client.chat.start(agent_id="agt_1", message="hi")
 
@@ -89,9 +87,7 @@ async def test_sends_post_with_token_and_minimal_body(
 async def test_includes_optional_fields_when_provided(
     client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
 ) -> None:
-    route = mock_api.post("/chat").mock(
-        return_value=httpx.Response(200, json=make_thread())
-    )
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
 
     await client.chat.start(
         agent_id="agt_1",
@@ -127,25 +123,17 @@ async def test_start_does_not_open_the_stream(
 async def test_valid_disabled_tools_accepted(
     client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread, tool: str
 ) -> None:
-    route = mock_api.post("/chat").mock(
-        return_value=httpx.Response(200, json=make_thread())
-    )
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
 
-    await client.chat.start(
-        agent_id="a", message="hi", disabled_tools=[tool]
-    )
+    await client.chat.start(agent_id="a", message="hi", disabled_tools=[tool])
 
     assert route.called
-    assert json.loads(route.calls.last.request.content)["message"]["disabled_tools"] == [
-        tool
-    ]
+    assert json.loads(route.calls.last.request.content)["message"]["disabled_tools"] == [tool]
 
 
 async def test_uses_configured_base_url(make_thread: MakeThread) -> None:
     with respx.mock(base_url="https://sandbox.test", assert_all_called=False) as router:
-        route = router.post("/chat").mock(
-            return_value=httpx.Response(200, json=make_thread())
-        )
+        route = router.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
         async with AsyncCominty(
             api_token="t", user_id=USER_ID, base_url="https://sandbox.test"
         ) as c:
@@ -162,9 +150,7 @@ async def test_invalid_disabled_tool_raises_before_request(
     route = mock_api.post("/chat")
 
     with pytest.raises(InvalidParams) as exc:
-        await client.chat.start(
-            agent_id="a", message="hi", disabled_tools=["bogus"]
-        )
+        await client.chat.start(agent_id="a", message="hi", disabled_tools=["bogus"])
 
     assert not route.called
     assert len(mock_api.calls) == 0
@@ -179,16 +165,16 @@ async def test_invalid_source_id_type_raises(
 
     with pytest.raises(InvalidParams) as exc:
         await client.chat.start(
-            agent_id="a", message="hi", source_ids=["nope"]  # type: ignore[list-item]
+            agent_id="a",
+            message="hi",
+            source_ids=["nope"],  # type: ignore[list-item]
         )
 
     assert not route.called
     assert any(e["param"] == "source_ids[0]" for e in exc.value.errors)
 
 
-async def test_content_too_long_raises(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
+async def test_content_too_long_raises(client: AsyncCominty, mock_api: respx.MockRouter) -> None:
     route = mock_api.post("/chat")
 
     with pytest.raises(InvalidParams) as exc:
@@ -198,16 +184,14 @@ async def test_content_too_long_raises(
     assert any(e["param"] == "content" for e in exc.value.errors)
 
 
-async def test_too_many_file_ids_raises(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
+async def test_too_many_file_ids_raises(client: AsyncCominty, mock_api: respx.MockRouter) -> None:
     route = mock_api.post("/chat")
 
     with pytest.raises(InvalidParams) as exc:
         await client.chat.start(
             agent_id="a",
             message="hi",
-                file_ids=[f"f{i}" for i in range(6)],
+            file_ids=[f"f{i}" for i in range(6)],
         )
 
     assert not route.called
@@ -221,7 +205,7 @@ async def test_multiple_validation_errors_collected(
         await client.chat.start(
             agent_id="a",
             message="hi",
-                disabled_tools=["bad"],
+            disabled_tools=["bad"],
             source_ids=["nope"],  # type: ignore[list-item]
         )
 
@@ -232,9 +216,7 @@ async def test_multiple_validation_errors_collected(
 
 async def test_invalid_params_message_is_clean(client: AsyncCominty) -> None:
     with pytest.raises(InvalidParams) as exc:
-        await client.chat.start(
-            agent_id="a", message="hi", disabled_tools=["bad"]
-        )
+        await client.chat.start(agent_id="a", message="hi", disabled_tools=["bad"])
 
     text = str(exc.value)
     assert text.startswith("Invalid parameters for chat.start:")
@@ -263,9 +245,7 @@ async def test_http_errors_map_to_exceptions(
     status: int,
     expected: type[Exception],
 ) -> None:
-    mock_api.post("/chat").mock(
-        return_value=httpx.Response(status, json={"detail": "nope"})
-    )
+    mock_api.post("/chat").mock(return_value=httpx.Response(status, json={"detail": "nope"}))
 
     with pytest.raises(expected):
         await client.chat.start(agent_id="a", message="hi")
@@ -322,9 +302,7 @@ async def test_rate_limit_organization_quota(
     assert "Quota resets at 2026-06-30T00:00:00+00:00" in text
 
 
-async def test_rate_limit_user_quota(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
+async def test_rate_limit_user_quota(client: AsyncCominty, mock_api: respx.MockRouter) -> None:
     mock_api.post("/chat").mock(
         return_value=httpx.Response(
             429,
@@ -358,9 +336,7 @@ async def test_thread_without_assistant_message_raises_sdk_error(
     make_message: MakeMessage,
     ids: SimpleNamespace,
 ) -> None:
-    payload = make_thread(
-        messages=[make_message(id=ids.user_msg, role="user", content="hi")]
-    )
+    payload = make_thread(messages=[make_message(id=ids.user_msg, role="user", content="hi")])
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=payload))
 
     with pytest.raises(SDKError):
@@ -379,9 +355,7 @@ async def test_picks_last_assistant_message(
             make_message(id=ids.user_msg, role="user", content="hi"),
             make_message(id=_ASSISTANT_1, role="assistant", content="first"),
             make_message(id=_USER_2, role="user", content="again"),
-            make_message(
-                id=_ASSISTANT_2, role="assistant", status="pending", live=True
-            ),
+            make_message(id=_ASSISTANT_2, role="assistant", status="pending", live=True),
         ]
     )
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=payload))

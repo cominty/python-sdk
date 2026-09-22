@@ -123,16 +123,12 @@ def test_retry_after_none_when_header_absent_from_present_headers() -> None:
 # RateLimitError.reset_at
 # --------------------------------------------------------------------------- #
 def test_reset_at_reads_detail_field() -> None:
-    err = RateLimitError(
-        "x", status_code=429, detail={"reset_at": "2026-06-28T10:00:00+00:00"}
-    )
+    err = RateLimitError("x", status_code=429, detail={"reset_at": "2026-06-28T10:00:00+00:00"})
     assert err.reset_at == datetime(2026, 6, 28, 10, 0, tzinfo=timezone.utc)
 
 
 def test_reset_at_falls_back_to_locked_until() -> None:
-    err = RateLimitError(
-        "x", status_code=429, detail={"locked_until": "2026-06-28T10:00:00+00:00"}
-    )
+    err = RateLimitError("x", status_code=429, detail={"locked_until": "2026-06-28T10:00:00+00:00"})
     assert err.reset_at is not None
 
 

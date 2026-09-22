@@ -48,9 +48,7 @@ class MemoryResource:
         Returns:
             list[MemoryFileSummaryOut]: One summary per file.
         """
-        raw = await self._transport.request(
-            "GET", "/memory", params={"user_id": self._user_id}
-        )
+        raw = await self._transport.request("GET", "/memory", params={"user_id": self._user_id})
         return [MemoryFileSummaryOut.model_validate(item) for item in raw]
 
     async def create(self, *, path: str, purpose: str, content: str) -> MemoryFileOut:
@@ -149,9 +147,7 @@ class MemoryResource:
             raise InvalidParams.from_validation_error(exc, context="memory.update") from None
         body = body_model.model_dump(mode="json", exclude_unset=True)
         params = {"path": path, "version": version, "user_id": self._user_id}
-        raw = await self._transport.request(
-            "PUT", "/memory/file", params=params, json_body=body
-        )
+        raw = await self._transport.request("PUT", "/memory/file", params=params, json_body=body)
         return MemoryFileOut.model_validate(raw)
 
     async def delete(self, path: str) -> None:

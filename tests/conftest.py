@@ -33,16 +33,12 @@ def user_id() -> str:
 @pytest.fixture
 def ids() -> SimpleNamespace:
     """Canonical UUIDs used across the default thread payload."""
-    return SimpleNamespace(
-        thread=THREAD_ID, user_msg=USER_MSG_ID, assistant_msg=ASSISTANT_MSG_ID
-    )
+    return SimpleNamespace(thread=THREAD_ID, user_msg=USER_MSG_ID, assistant_msg=ASSISTANT_MSG_ID)
 
 
 @pytest_asyncio.fixture
 async def client(base_url: str) -> AsyncIterator[AsyncCominty]:
-    async with AsyncCominty(
-        api_token="test-token", user_id=USER_ID, base_url=base_url
-    ) as instance:
+    async with AsyncCominty(api_token="test-token", user_id=USER_ID, base_url=base_url) as instance:
         yield instance
 
 

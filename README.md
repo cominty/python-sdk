@@ -326,6 +326,16 @@ COMINTY_API_KEY=... COMINTY_USER_ID=... uv run pytest -m integration
 
 See [AGENTS.md](AGENTS.md) for coding conventions (typing, versioning, models).
 
+## Developer tasks
+
+```bash
+uv run invoke --list       # show all tasks, including the code.* namespace
+uv run invoke code.format  # ruff format, then ruff check --fix
+uv run invoke code.check   # ruff check, ruff format --check, pyright
+uv run invoke code.test    # pytest --cov, same --cov-fail-under=100 floor as CI
+uv run invoke code.all     # format, then check, then test: run before opening a PR
+```
+
 ## Releasing
 
 Publishing to PyPI uses **Trusted Publishing (OIDC)**: no tokens stored in
@@ -336,7 +346,9 @@ GitHub, triggered by publishing a **GitHub Release**
 **`uv run invoke release` modifies repository files and CREATES A GIT COMMIT
 AND TAG.** It bumps `pyproject.toml`, regenerates `uv.lock`, runs the lint /
 type-check / test / build gate, then commits and tags: it never pushes and
-never creates the GitHub Release itself.
+never creates the GitHub Release itself. It asks for confirmation before
+writing any file, and again before committing and tagging; pass `--yes` to
+skip both prompts.
 
 ```bash
 # 1. bump, validate, commit, and tag locally: pick exactly one
@@ -346,8 +358,7 @@ uv run invoke release --major            # X.Y.Z -> (X+1).0.0
 uv run invoke release --version X.Y.Z    # set an explicit version
 
 # 2. push the commit and the tag it just created
-git push origin HEAD
-git push origin vX.Y.Z
+git push origin HEAD --follow-tags
 
 # 3. create the release: this triggers the publish workflow
 gh release create vX.Y.Z --title vX.Y.Z --generate-notes

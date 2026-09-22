@@ -130,9 +130,7 @@ class RateLimitError(APIError):
                 the ``X-RateLimit-Reset`` header, else ``None``.
         """
         if isinstance(self.detail, dict):
-            parsed = _parse_dt(
-                self.detail.get("reset_at") or self.detail.get("locked_until")
-            )
+            parsed = _parse_dt(self.detail.get("reset_at") or self.detail.get("locked_until"))
             if parsed is not None:
                 return parsed
         if self.headers:
@@ -188,15 +186,11 @@ class InvalidParams(ComintyError):
         self.errors = errors
 
     @classmethod
-    def from_validation_error(
-        cls, exc: ValidationError, *, context: str
-    ) -> InvalidParams:
+    def from_validation_error(cls, exc: ValidationError, *, context: str) -> InvalidParams:
         grouped: dict[str, dict[str, Any]] = {}
         for err in exc.errors(include_url=False):
             path = _clean_param_path(err["loc"])
-            group = grouped.setdefault(
-                path, {"msgs": [], "input": None, "show_input": False}
-            )
+            group = grouped.setdefault(path, {"msgs": [], "input": None, "show_input": False})
             if err["msg"] not in group["msgs"]:
                 group["msgs"].append(err["msg"])
             # "missing"/"extra_forbidden" carry the parent container as input.
@@ -224,9 +218,7 @@ def _clean_param_path(loc: tuple[str | int, ...]) -> str:
     # Drop message/options wrappers and pydantic tags such as "literal[...]"
     # or "constrained-str". Those segments contain "[" or "-".
     parts: list[str | int] = [
-        seg
-        for seg in loc
-        if isinstance(seg, int) or ("[" not in seg and "-" not in seg)
+        seg for seg in loc if isinstance(seg, int) or ("[" not in seg and "-" not in seg)
     ]
     if parts and parts[0] in ("message", "options"):
         parts = parts[1:]
@@ -255,9 +247,7 @@ def error_from_response(
     if isinstance(body, dict):
         detail = cast("dict[str, Any]", body).get("detail")
     message = detail if isinstance(detail, str) else f"HTTP {status_code}"
-    cls = _STATUS_MAP.get(status_code) or (
-        ServerError if status_code >= 500 else APIError
-    )
+    cls = _STATUS_MAP.get(status_code) or (ServerError if status_code >= 500 else APIError)
     # A bare "HTTP 429" is useless. Turn the server's terse detail into a clear,
     # actionable message (which limit was hit + what the caller can do).
     if cls is RateLimitError:
@@ -285,8 +275,7 @@ _ADMIN_HINT = "Ask an organization admin to raise your plan's limit."
 # Per-scope opener, made explicit so the caller knows *which* limit was hit.
 _QUOTA_HEAD = {
     "organization": (
-        "Organization rate limit reached: your organization's total request "
-        "quota is exhausted"
+        "Organization rate limit reached: your organization's total request quota is exhausted"
     ),
     "user": "User rate limit reached: your user request quota is exhausted",
 }
@@ -315,8 +304,7 @@ def _rate_limit_message(
     else:
         head = text or "Rate limit reached"
 
-    when = _when_phrase(_parse_dt(info.get("reset_at") or info.get("locked_until")),
-                        headers)
+    when = _when_phrase(_parse_dt(info.get("reset_at") or info.get("locked_until")), headers)
     tail = f" {when}" if when else ""
     return f"{head}. {_ADMIN_HINT}{tail}"
 
