@@ -485,3 +485,51 @@ One-time PyPI setup (must match the workflow exactly, or PyPI rejects the token)
 Note: `release.yml` builds + `twine check`s but does **not** run the test suite — tests run
 in `ci.yml` on push/PR to `main`/`dev`. Only merge to `main` through green CI so a Release
 never ships untested code.
+
+---
+
+## 13. Prose and docstrings
+
+### 13.1 No em dashes
+
+Do not use the em dash character (`—`, U+2014) anywhere: source, comments, docstrings,
+examples, Markdown, YAML, or TOML. Rewrite the sentence with a colon, a comma, a period,
+or parentheses. Hyphens and en dashes in numeric ranges stay.
+
+### 13.2 Where docstrings are allowed
+
+- No module docstring in `src/` or `tests/`. The filename is enough.
+- Module docstrings stay in `examples/`. They are the script's usage note.
+- No docstring on a non-public function (leading underscore, or any helper a SDK user does
+  not call). If the name hides a real subtlety, rename it. If a better name is not enough,
+  leave a short comment that explains why. Do not write a docstring just to have one.
+- Invoke tasks in `tasks.py` keep their docstrings. `invoke --list` prints them as CLI help.
+
+### 13.3 Public methods
+
+Document a method only when a SDK user calls it (`AsyncCominty`, `client.chat`,
+`client.threads`, `client.memory`, and the other methods on that surface). Use Google style:
+
+- A short summary on the first line.
+- A longer description only when the behavior is not obvious from the signature.
+- `Args`: every parameter, its type, and its role.
+- `Returns`: the type and what it represents.
+- `Raises`: only when the failure is not obvious.
+- `Examples`: only when the call shape is not obvious from the signature.
+
+```python
+async def start(self, *, agent_id: str, message: str) -> StartedChat:
+    """
+    Start a new thread with a first user message.
+
+    Args:
+        agent_id (str): Managed agent that handles the thread.
+        message (str): First user message.
+
+    Returns:
+        StartedChat: Handle for the in-progress assistant reply.
+
+    Raises:
+        InvalidParams: ``agent_id`` or ``message`` failed local validation.
+    """
+```
