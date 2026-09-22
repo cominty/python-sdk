@@ -21,6 +21,14 @@ from .exceptions import (
     ServerError,
     StreamInterrupted,
 )
+from .models.agents import (
+    CreateAgentParams,
+    CustomAgent,
+    CustomAgentSummary,
+    LLMModelSummary,
+    SetAgentModelsParams,
+    UpdateAgentParams,
+)
 from .models.chat import (
     Agent,
     ContentOrigin,
@@ -69,16 +77,22 @@ __all__ = [
     "Agent",
     "ContentOrigin",
     "ConversationFile",
+    "CreateAgentParams",
+    "CustomAgent",
+    "CustomAgentSummary",
     "DisablableTool",
     "HumanMessage",
+    "LLMModelSummary",
     "Message",
     "MessageRole",
     "MessageStatus",
     "Question",
+    "SetAgentModelsParams",
     "ShareLink",
     "StartChatOptions",
     "StartChatParams",
     "Thread",
     "ThreadSummary",
+    "UpdateAgentParams",
     "UpdateThreadParams",
 ]
