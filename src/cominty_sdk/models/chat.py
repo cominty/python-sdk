@@ -1,10 +1,3 @@
-"""Request and response models for the chat resource.
-
-Request models are strict (``strict=True, extra="forbid"``) so caller mistakes
-surface immediately. Response models are lenient (``extra="ignore"``) so the SDK
-tolerates additive API changes without a release.
-"""
-
 from __future__ import annotations
 
 import re
@@ -74,11 +67,6 @@ _USER_ID_PATTERN = re.compile(r"^user_[A-Za-z0-9]{20,}$")
 
 
 def validate_user_id(value: str) -> str:
-    """Return ``value`` if it's a well-formed Cominty user id, else raise.
-
-    Shared by the :data:`UserId` model type and the client, which validates the
-    client-level ``user_id`` up front so a typo fails locally, not as a 400/404.
-    """
     if not _USER_ID_PATTERN.match(value):
         raise ValueError(
             "expected a Cominty user id like 'user_xxxxxxxxxxxxxxxxxPbKB' "
@@ -110,7 +98,7 @@ validated, so arbitrary strings are rejected rather than silently sent."""
 
 
 # --------------------------------------------------------------------------- #
-# Request models  (strict — reject unknown fields, no coercion)
+# Request models  (strict: reject unknown fields, no coercion)
 # --------------------------------------------------------------------------- #
 class HumanMessage(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -140,7 +128,7 @@ class StartChatParams(BaseModel):
 
 class UpdateThreadParams(BaseModel):
     """Mutable thread fields. Only the fields you pass are sent (``exclude_none``),
-    so updates are partial — omitted fields keep their current value."""
+    so updates are partial: omitted fields keep their current value."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
@@ -149,7 +137,7 @@ class UpdateThreadParams(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
-# Response models  (lenient — ignore unknown fields)
+# Response models  (lenient: ignore unknown fields)
 # --------------------------------------------------------------------------- #
 class Question(BaseModel):
     model_config = ConfigDict(extra="ignore")

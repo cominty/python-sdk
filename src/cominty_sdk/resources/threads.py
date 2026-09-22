@@ -1,5 +1,3 @@
-"""The threads resource: list, read, rename/star, and archive conversations."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -25,12 +23,19 @@ class ThreadsResource:
         page: int = 0,
         terms: list[str] | None = None,
     ) -> list[ThreadSummary]:
-        """List the current user's threads, newest first.
+        """
+        List the current user's threads, newest first.
 
-        Sends ``GET /chat`` scoped to the client's ``user_id``. ``terms`` filters
-        by free-text search; ``limit``/``page`` paginate (page is zero-based).
-        Returns lightweight :class:`~.models.chat.ThreadSummary` objects (no
-        messages) — call :meth:`get` to load a thread's contents.
+        Sends ``GET /chat`` scoped to the client's ``user_id``. Summaries do not
+        include messages. Call :meth:`get` to load a thread's contents.
+
+        Args:
+            limit (int): Page size. Default is 50.
+            page (int): Zero-based page index. Default is 0.
+            terms (list[str] | None): Free-text search terms. Omit to list everything.
+
+        Returns:
+            list[ThreadSummary]: Matching thread summaries.
         """
         params: dict[str, object] = {
             "user_id": self._user_id,
@@ -43,7 +48,17 @@ class ThreadsResource:
         return [ThreadSummary.model_validate(item) for item in raw]
 
     async def get(self, thread_id: str | UUID) -> Thread:
-        """Fetch a single thread with its full message history (``GET /chat/{id}``)."""
+        """
+        Fetch one thread, including its messages.
+
+        Sends ``GET /chat/{thread_id}``.
+
+        Args:
+            thread_id (str | UUID): Thread to load.
+
+        Returns:
+            Thread: The thread and its message history.
+        """
         raw = await self._transport.request("GET", f"/chat/{thread_id}")
         return Thread.model_validate(raw)
 
@@ -54,11 +69,19 @@ class ThreadsResource:
         name: str | None = None,
         starred: bool | None = None,
     ) -> ThreadSummary:
-        """Rename and/or (un)star a thread (``PUT /chat/{id}``).
+        """
+        Rename and/or star a thread.
 
-        Partial: only the fields you pass are sent. Returns the updated thread
-        as a :class:`~.models.chat.ThreadSummary` — this endpoint responds
-        without the message history (unlike :meth:`get`).
+        Sends ``PUT /chat/{thread_id}``. Only the fields you pass are sent.
+        The response is a summary, without messages.
+
+        Args:
+            thread_id (str | UUID): Thread to update.
+            name (str | None): New title. Omit it to leave the title unchanged.
+            starred (bool | None): Starred flag. Omit it to leave the flag unchanged.
+
+        Returns:
+            ThreadSummary: The updated thread, without messages.
         """
         body = UpdateThreadParams(name=name, starred=starred).model_dump(
             mode="json", exclude_none=True
@@ -67,5 +90,15 @@ class ThreadsResource:
         return ThreadSummary.model_validate(raw)
 
     async def archive(self, thread_id: str | UUID) -> None:
-        """Archive (soft-delete) a thread (``DELETE /chat/{id}``)."""
+        """
+        Archive a thread. This is a soft delete.
+
+        Sends ``DELETE /chat/{thread_id}``.
+
+        Args:
+            thread_id (str | UUID): Thread to archive.
+
+        Returns:
+            None: The thread is archived.
+        """
         await self._transport.request("DELETE", f"/chat/{thread_id}")

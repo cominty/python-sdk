@@ -1,8 +1,3 @@
-"""Unit tests for the exception hierarchy: status-code mapping, the 429
-scope/retry_after/reset_at properties, rate-limit message composition, and
-InvalidParams.from_validation_error's grouping of pydantic errors.
-"""
-
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -25,7 +20,7 @@ from cominty_sdk.models.chat import HumanMessage
 
 
 # --------------------------------------------------------------------------- #
-# error_from_response — status-code mapping
+# error_from_response: status-code mapping
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "status_code, expected_cls",
@@ -262,7 +257,7 @@ def test_from_validation_error_deduplicates_repeated_messages_on_same_field() ->
 
 def test_from_validation_error_suppresses_input_for_missing_and_extra_forbidden() -> None:
     # "missing"/"extra_forbidden" carry the parent container as `input`, which
-    # is noise — it's dropped rather than surfaced as the offending value.
+    # is noise: it's dropped rather than surfaced as the offending value.
     exc = ValidationError.from_exception_data(
         "Test",
         [

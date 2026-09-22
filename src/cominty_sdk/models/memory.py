@@ -25,7 +25,6 @@ _MAX_PATH_DEPTH = 1
 
 
 def validate_memory_path(value: str) -> str:
-    """Return ``value`` if it's within the API's folder-depth limit, else raise."""
     depth = value.count("/")
     if depth > _MAX_PATH_DEPTH:
         raise ValueError(
@@ -64,7 +63,7 @@ class MemoryFileUpdate(BaseModel):
 
     Dumped with ``exclude_unset=True`` so only explicitly-passed fields are
     sent. The API does not currently support clearing ``content``/``purpose``
-    once set — a ``null`` is silently ignored server-side (200, value
+    once set: a ``null`` is silently ignored server-side (200, value
     unchanged) rather than clearing the field. To avoid that confusing
     silent-no-op, this model rejects an explicit ``None`` locally instead of
     forwarding it.
@@ -88,7 +87,7 @@ class MemoryFileUpdate(BaseModel):
             fields = " and ".join(nulled)
             raise ValueError(
                 f"{fields} cannot be set to None: the API does not support "
-                "clearing a field once set (it's currently a silent no-op) — "
+                "clearing a field once set (it's currently a silent no-op): "
                 "omit the argument instead of passing None"
             )
         return self
@@ -103,7 +102,7 @@ class MemoryFileOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     version: str
-    """Opaque concurrency token — pass it back unchanged to
+    """Opaque concurrency token: pass it back unchanged to
     :meth:`~.resources.memory.MemoryResource.update`."""
 
 

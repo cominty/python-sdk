@@ -1,9 +1,3 @@
-"""Tests for the `release` invoke task in tasks.py.
-
-Everything runs inside a disposable temp Git repo (see the `repo` fixture) —
-never against this actual repository.
-"""
-
 from __future__ import annotations
 
 import subprocess
@@ -54,7 +48,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _git("add", "-A")
     _git("commit", "-q", "-m", "initial")
     # The SDK's own lint/type-check/test/build gate has nothing to check
-    # against a scratch project — stub it out so tests only exercise the
+    # against a scratch project: stub it out so tests only exercise the
     # version/Git logic.
     monkeypatch.setattr(tasks, "_run_validation", lambda c: None)
     return tmp_path
@@ -95,7 +89,7 @@ def test_release_success(
 
 
 # --------------------------------------------------------------------------- #
-# failures — each must leave the repo untouched
+# failures: each must leave the repo untouched
 # --------------------------------------------------------------------------- #
 def test_release_no_mode_fails(repo: Path, c: Context) -> None:
     before = _git_out("rev-parse", "HEAD")

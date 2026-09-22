@@ -1,5 +1,3 @@
-"""The memory resource: list, create, read, update, and delete memory files."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Union
@@ -16,21 +14,17 @@ from ..models.memory import (
 )
 
 if TYPE_CHECKING:
+    # types.EllipsisType is 3.10+; this import is annotation-only so the
+    # future import keeps it from ever running on the 3.9 floor.
+    from types import EllipsisType
+
     from .._transport import AsyncTransport
 
 __all__ = ["MemoryResource"]
 
-
-class _Unset:
-    """Sentinel default distinguishing "not passed" from "passed as ``None``"
-    for :meth:`MemoryResource.update`'s optional fields."""
-
-    def __repr__(self) -> str:  # pragma: no cover - debug display only, never returned to callers
-        return "UNSET"
-
-
-_UNSET = _Unset()
-_OptionalField = Union[str, None, _Unset]
+# Ellipsis distinguishes "argument omitted" from "passed as None" on update().
+# typing.Sentinel would be the natural fit, but it's 3.13+, above the floor.
+_OptionalField = Union[str, None, "EllipsisType"]
 
 
 class MemoryResource:
@@ -46,23 +40,39 @@ class MemoryResource:
             raise InvalidParams.from_validation_error(exc, context=context) from None
 
     async def list(self) -> list[MemoryFileSummaryOut]:
-        """List the current user's memory files (``GET /memory``)."""
+        """
+        List the current user's memory files.
+
+        Sends ``GET /memory``. Summaries do not include file content.
+
+        Returns:
+            list[MemoryFileSummaryOut]: One summary per file.
+        """
         raw = await self._transport.request(
             "GET", "/memory", params={"user_id": self._user_id}
         )
         return [MemoryFileSummaryOut.model_validate(item) for item in raw]
 
     async def create(self, *, path: str, purpose: str, content: str) -> MemoryFileOut:
-        """Create a memory file (``POST /memory``, 201 Created).
+        """
+        Create a memory file.
 
-        Unlike every other memory endpoint, ``user_id`` is injected into the
-        request body here rather than sent as a query param. ``path`` may have
-        at most one folder segment (``"folder/file.md"``, not
-        ``"a/b/file.md"``); a deeper path raises
-        :class:`~.exceptions.InvalidParams` locally. ``content`` may be an
-        empty string — the API doesn't enforce a minimum length. Creating at a
-        ``path`` that already exists raises
-        :class:`~.exceptions.ConflictError` (409).
+        Sends ``POST /memory`` (201). ``user_id`` is sent in the body, unlike
+        the other memory calls, which send it as a query parameter. ``path``
+        may have at most one folder segment (``"folder/file.md"``). ``content``
+        may be empty.
+
+        Args:
+            path (str): File path, at most one folder deep.
+            purpose (str): Why the file exists. The agent reads this.
+            content (str): File body. An empty string is allowed.
+
+        Returns:
+            MemoryFileOut: The created file, including its ``version`` token.
+
+        Raises:
+            InvalidParams: ``path`` is deeper than one folder.
+            ConflictError: A file already exists at ``path``.
         """
         try:
             params = MemoryFileCreate(
@@ -76,7 +86,21 @@ class MemoryResource:
         return MemoryFileOut.model_validate(raw)
 
     async def get(self, path: str) -> MemoryFileOut:
-        """Fetch a single memory file (``GET /memory/file``)."""
+        """
+        Fetch one memory file, including its content.
+
+        Sends ``GET /memory/file``.
+
+        Args:
+            path (str): File path, at most one folder deep.
+
+        Returns:
+            MemoryFileOut: The file, including ``content`` and ``version``.
+
+        Raises:
+            InvalidParams: ``path`` is deeper than one folder.
+            NotFoundError: No file exists at ``path``.
+        """
         path = self._validate_path(path, context="memory.get")
         raw = await self._transport.request(
             "GET", "/memory/file", params={"path": path, "user_id": self._user_id}
@@ -88,31 +112,36 @@ class MemoryResource:
         path: str,
         *,
         version: str,
-        content: _OptionalField = _UNSET,
-        purpose: _OptionalField = _UNSET,
+        content: _OptionalField = ...,
+        purpose: _OptionalField = ...,
     ) -> MemoryFileOut:
-        """Update a memory file's content and/or purpose (``PUT /memory/file``).
+        """
+        Update a memory file's content and/or purpose.
 
-        Partial: only the fields you pass are sent. ``version`` is the opaque
-        token from a previous read; a stale one raises
-        :class:`~.exceptions.ConflictError` (409).
+        Sends ``PUT /memory/file``. Only the fields you pass are sent. Omit a
+        field to leave it unchanged. Passing ``None`` is rejected locally: the
+        API ignores a null and would leave the stored value in place.
 
-        The API does not currently support clearing ``content``/``purpose``
-        once set — passing ``content=None`` or ``purpose=None`` raises
-        :class:`~.exceptions.InvalidParams` locally rather than silently
-        sending a ``null`` the server would ignore. Omit the argument to
-        leave a field untouched.
+        Args:
+            path (str): File path, at most one folder deep.
+            version (str): Opaque token from a previous read. Pass it back unchanged.
+            content (str | None): New body. Omit the argument to leave it unchanged.
+            purpose (str | None): New purpose. Omit the argument to leave it unchanged.
 
-        ``version`` must be a real version token from a previous read, not an
-        arbitrary string — a well-formed but stale one raises
-        :class:`~.exceptions.ConflictError` (409), a malformed one raises
-        :class:`~.exceptions.APIError` (422).
+        Returns:
+            MemoryFileOut: The updated file, including the new ``version``.
+
+        Raises:
+            InvalidParams: ``path`` is too deep, neither field was passed, or a
+                field was passed as ``None``.
+            ConflictError: ``version`` is well formed but stale.
+            APIError: ``version`` is malformed (422).
         """
         path = self._validate_path(path, context="memory.update")
         fields: dict[str, object] = {}
-        if not isinstance(content, _Unset):
+        if content is not ...:
             fields["content"] = content
-        if not isinstance(purpose, _Unset):
+        if purpose is not ...:
             fields["purpose"] = purpose
         try:
             body_model = MemoryFileUpdate.model_validate(fields)
@@ -126,11 +155,21 @@ class MemoryResource:
         return MemoryFileOut.model_validate(raw)
 
     async def delete(self, path: str) -> None:
-        """Delete a memory file (``DELETE /memory/file``, 204 No Content).
+        """
+        Delete a memory file.
 
-        Not idempotent: deleting an already-deleted (or never-existing) path
-        raises :class:`~.exceptions.NotFoundError` (404) rather than
-        succeeding again.
+        Sends ``DELETE /memory/file`` (204). Not idempotent: a missing path
+        raises, it does not succeed again.
+
+        Args:
+            path (str): File path, at most one folder deep.
+
+        Returns:
+            None: The file is deleted.
+
+        Raises:
+            InvalidParams: ``path`` is deeper than one folder.
+            NotFoundError: The path does not exist.
         """
         path = self._validate_path(path, context="memory.delete")
         await self._transport.request(

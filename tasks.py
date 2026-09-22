@@ -1,12 +1,3 @@
-"""Developer tasks. Run with `uv run invoke <task>` (e.g. `uv run invoke publish-test`).
-
-List tasks:         uv run invoke --list
-Build + validate:   uv run invoke check
-Dry-run to TestPyPI: uv run invoke publish-test
-Bump + tag release: uv run invoke release --patch|--minor|--major|--version X.Y.Z
-Real release:       done via CI on GitHub Release (see .github/workflows/release.yml)
-"""
-
 from __future__ import annotations
 
 import re
@@ -45,7 +36,7 @@ def check(c):
     help={"token": "TestPyPI API token. Or set UV_PUBLISH_TOKEN in the env."},
 )
 def publish_test(c, token=None):
-    """Upload to TestPyPI (rehearsal — never burns a real PyPI version)."""
+    """Upload to TestPyPI (rehearsal: never burns a real PyPI version)."""
     cmd = f"uv publish --publish-url {TESTPYPI_URL}"
     if token:
         cmd += f" --token {token}"
@@ -88,7 +79,7 @@ def _read_version(text: str) -> str:
     current = match.group(2)
     if not _XYZ_RE.fullmatch(current):
         raise Exit(
-            f"pyproject.toml's version {current!r} isn't X.Y.Z — fix it manually first"
+            f"pyproject.toml's version {current!r} isn't X.Y.Z: fix it manually first"
         )
     return current
 
@@ -128,7 +119,6 @@ def _tag_exists(c, tag: str) -> bool:
 
 
 def _run_validation(c) -> None:
-    """The pre-commit gate: lint, type-check, tests, and a packaging dry run."""
     c.run("uv run ruff check .", echo=True, in_stream=False)
     c.run("uv run pyright", echo=True, in_stream=False)
     c.run("uv run pytest", echo=True, in_stream=False)
@@ -147,7 +137,7 @@ def release(c, patch=False, minor=False, major=False, version=None):
     """Bump the version and cut a release commit + tag.
 
     WARNING: this modifies repository files and CREATES A GIT COMMIT AND TAG.
-    It never pushes and never creates a GitHub Release — run the commands it
+    It never pushes and never creates a GitHub Release: run the commands it
     prints at the end to do that yourself.
 
     Exactly one of --patch/--minor/--major/--version is required.
@@ -161,7 +151,7 @@ def release(c, patch=False, minor=False, major=False, version=None):
         )
 
     if not PYPROJECT_PATH.exists():
-        raise Exit("pyproject.toml not found — run this from the repo root")
+        raise Exit("pyproject.toml not found: run this from the repo root")
 
     original_pyproject = PYPROJECT_PATH.read_text()
     current = _read_version(original_pyproject)
@@ -178,7 +168,7 @@ def release(c, patch=False, minor=False, major=False, version=None):
     tag = f"v{target}"
 
     if _git_is_dirty(c):
-        raise Exit("git working tree is dirty — commit or stash changes before releasing")
+        raise Exit("git working tree is dirty: commit or stash changes before releasing")
     if _tag_exists(c, tag):
         raise Exit(f"tag {tag} already exists")
 

@@ -1,5 +1,3 @@
-"""Resolved client configuration."""
-
 from __future__ import annotations
 
 import os
@@ -16,12 +14,7 @@ _USER_ID_ENV = "COMINTY_USER_ID"
 
 @dataclass(frozen=True)
 class Config:
-    """Immutable, fully-resolved client configuration. Built once at construction.
-
-    Internal plumbing, not an I/O boundary — a frozen dataclass, not a pydantic
-    model. This layer only resolves values and checks the required ones are
-    present; format validation belongs on the request/response models.
-    """
+    # Frozen dataclass, not a pydantic model: this layer only resolves values.
 
     api_token: str
     user_id: str

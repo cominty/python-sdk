@@ -1,10 +1,3 @@
-"""Shared fixtures for the v1 test suite.
-
-Minimalist on purpose — a base URL, a live ``AsyncCominty`` bound to a respx
-mock, and small factories for the ``ThreadOut`` / ``MessageOut`` payloads the
-chat endpoints return.
-"""
-
 from __future__ import annotations
 
 import json
@@ -22,7 +15,7 @@ BASE_URL = "https://api.test"
 THREAD_ID = "11111111-1111-1111-1111-111111111111"
 USER_MSG_ID = "22222222-2222-2222-2222-222222222222"
 ASSISTANT_MSG_ID = "33333333-3333-3333-3333-333333333333"
-# A well-formed Cominty (Clerk) user id — matches ^user_[A-Za-z0-9]{20,}$, which
+# A well-formed Cominty (Clerk) user id: matches ^user_[A-Za-z0-9]{20,}$, which
 # the client validates at construction. Set once, applied to every call.
 USER_ID = "user_31HPTBuBvX20xlQNAbvxjOxPbKB"
 

@@ -35,7 +35,7 @@ uv run pytest -m integration
 
 ## Releasing (maintainers)
 
-Releases are driven by git tags — see the "Releasing" section in the
+Releases are driven by git tags: see the "Releasing" section in the
 [README](README.md). In short: bump `version` in `pyproject.toml`, push a
 pre-release tag (`vX.Y.Zrc1`) to validate on TestPyPI, then a final tag
 (`vX.Y.Z`) to publish to PyPI.

@@ -1,10 +1,3 @@
-"""Exhaustive unit tests for ``client.chat.start``.
-
-Covers: the request it sends, the handle it returns, client-side validation
-(which must never hit the network), HTTP error mapping, and edge cases in
-locating the assistant reply.
-"""
-
 from __future__ import annotations
 
 import json
@@ -32,7 +25,7 @@ from cominty_sdk import (
 MakeThread = Callable[..., dict[str, Any]]
 MakeMessage = Callable[..., dict[str, Any]]
 
-# A well-formed Cominty (Clerk) user id — must match ^user_[A-Za-z0-9]{20,}$,
+# A well-formed Cominty (Clerk) user id: must match ^user_[A-Za-z0-9]{20,}$,
 # which client-side validation enforces before any request goes out.
 USER_ID = "user_31HPTBuBvX20xlQNAbvxjOxPbKB"
 
@@ -43,7 +36,7 @@ _ASSISTANT_2 = "66666666-6666-6666-6666-666666666666"
 
 
 # --------------------------------------------------------------------------- #
-# Happy path — the returned handle
+# Happy path: the returned handle
 # --------------------------------------------------------------------------- #
 async def test_returns_started_chat_with_thread_and_reply(
     client: AsyncCominty,
@@ -66,12 +59,12 @@ async def test_thread_is_non_optional_on_started_chat(
 ) -> None:
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
     run = await client.chat.start(agent_id="agt_1", message="hi")
-    # StartedChat narrows thread to Thread (never None) — accessible without a guard.
+    # StartedChat narrows thread to Thread (never None): accessible without a guard.
     assert run.thread.messages[0].role.value == "user"
 
 
 # --------------------------------------------------------------------------- #
-# Happy path — the request that goes out
+# Happy path: the request that goes out
 # --------------------------------------------------------------------------- #
 async def test_sends_post_with_token_and_minimal_body(
     client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
@@ -161,7 +154,7 @@ async def test_uses_configured_base_url(make_thread: MakeThread) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Client-side validation — must fail BEFORE any HTTP request
+# Client-side validation: must fail BEFORE any HTTP request
 # --------------------------------------------------------------------------- #
 async def test_invalid_disabled_tool_raises_before_request(
     client: AsyncCominty, mock_api: respx.MockRouter
@@ -296,7 +289,7 @@ async def test_rate_limit_concurrency_message(
     assert err.scope == "concurrency"
     text = str(err)
     assert "concurrent" in text.lower()
-    assert "Wait for an in-flight request" in text  # transient — retry guidance
+    assert "Wait for an in-flight request" in text  # transient: retry guidance
     assert "admin" in text.lower()
 
 

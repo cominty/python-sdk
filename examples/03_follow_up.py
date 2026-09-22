@@ -1,4 +1,4 @@
-"""Continue a conversation — send a follow-up in the same thread.
+"""Continue a conversation: send a follow-up in the same thread.
 
     python examples/03_follow_up.py
 
@@ -17,7 +17,7 @@ from _shared import AGENT_ID, make_client
 
 async def main() -> None:
     async with make_client() as client:
-        # Turn 1 — start the thread.
+        # Turn 1: start the thread.
         first = await client.chat.start(
             agent_id=AGENT_ID,
             message="Pick a programming language and say why in one line.",
@@ -26,7 +26,7 @@ async def main() -> None:
         pretty.rule("Turn 1")
         pretty.answer(await first.text())
 
-        # Turn 2 — follow up in the SAME thread; the agent remembers turn 1.
+        # Turn 2: follow up in the SAME thread; the agent remembers turn 1.
         second = await client.chat.send(
             thread_id,
             agent_id=AGENT_ID,

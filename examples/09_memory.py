@@ -4,7 +4,7 @@
 
 Demonstrates the full memory resource lifecycle. ``update`` is partial: only
 the fields you pass are changed, and ``version`` (an opaque token from the
-previous read) guards against overwriting a concurrent change — a stale
+previous read) guards against overwriting a concurrent change: a stale
 ``version`` raises ``ConflictError``. The file created here is always deleted
 before the script exits, even on error.
 """
@@ -43,7 +43,7 @@ async def main() -> None:
 
             # update() is partial: only content changes here, purpose is untouched.
             # version must match the file's current version or this raises
-            # ConflictError (409) — the API's optimistic-concurrency guard.
+            # ConflictError (409): the API's optimistic-concurrency guard.
             updated = await client.memory.update(
                 path, version=fetched.version, content="Buy oat milk instead."
             )

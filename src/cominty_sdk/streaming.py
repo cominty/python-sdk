@@ -1,16 +1,3 @@
-"""The streaming handle returned by the chat resource.
-
-``AssistantRun`` wraps a started assistant message: it carries the ``Thread`` and
-``message_id`` the POST already returned, and lazily opens the JSONL stream when
-you consume it. Iterating yields progress *events* only; the terminal message is
-captured internally and returned by :meth:`AssistantRun.result` /
-:meth:`AssistantRun.text`.
-
-This is where wire lines are *classified* — events vs the terminal ``Message``
-snapshot vs a server-shutdown ``Partial`` — domain knowledge the transport
-deliberately does not have.
-"""
-
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, AsyncIterator
@@ -58,8 +45,12 @@ class AssistantRun:
 
     @property
     def thread(self) -> Thread | None:
-        """The thread from the originating ``start`` call, if any (``None`` for a
-        bare ``chat.stream(message_id)``)."""
+        """
+        Thread from the originating ``start`` call, when there is one.
+
+        Returns:
+            Thread | None: The thread, or ``None`` for ``chat.stream(message_id)``.
+        """
         return self._thread
 
     def __aiter__(self) -> AsyncIterator[AnyEvent]:
@@ -70,7 +61,7 @@ class AssistantRun:
     async def _stream(self) -> AsyncGenerator[AnyEvent]:
         if self._consumed:
             # __aiter__ memoizes self._gen, so this never re-fires through the
-            # public API — a defensive guard against calling this method directly.
+            # public API: a defensive guard against calling this method directly.
             raise SDKError("this AssistantRun stream has already been consumed")  # pragma: no cover
         self._consumed = True
 
@@ -99,10 +90,16 @@ class AssistantRun:
                 return
 
     async def result(self) -> Message:
-        """Drain the stream (if needed) and return the final :class:`Message`.
+        """
+        Drain the stream if needed and return the final message.
 
-        Raises :class:`~.exceptions.StreamInterrupted` if the server shut down
-        mid-stream.
+        Returns:
+            Message: The terminal assistant message.
+
+        Raises:
+            StreamInterrupted: The server shut down before the message completed.
+            SDKError: The stream was already partially consumed, or it ended
+                without a terminal message.
         """
         if self._terminal is not None:
             return self._terminal
@@ -117,17 +114,30 @@ class AssistantRun:
         return self._terminal
 
     async def text(self) -> str:
-        """The assistant's final reply text."""
+        """
+        The assistant's final reply text.
+
+        Returns:
+            str: ``result().content``.
+        """
         return (await self.result()).content
 
     async def questions(self) -> list[Question]:
-        """Clarifying questions the agent is asking, if any.
+        """
+        Clarifying questions the agent is asking, if any.
 
-        When the agent needs more input it ends its turn with one or more
-        :class:`~.models.chat.Question` (each a ``prompt`` plus suggested
-        ``options``). Answer by sending the chosen option — or free text — as the
-        next message: ``await client.chat.send(run.thread.id, message=...,
-        agent_id=...)``. Empty list means the agent gave a final answer.
+        An empty list means the agent gave a final answer. Answer a question by
+        sending the chosen option, or free text, as the next message.
+
+        Returns:
+            list[Question]: Each item has a ``prompt`` and suggested ``options``.
+
+        Examples:
+            await client.chat.send(
+                run.thread.id,
+                message=picked,
+                agent_id="agt_1",
+            )
         """
         return (await self.result()).questions or []
 

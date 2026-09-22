@@ -1,13 +1,4 @@
-"""Typed events emitted by ``GET /chat/messages/{message_id}/stream``.
-
-The chat stream is **progress streaming, not token streaming** — there is no
-text-delta event. The assistant's reply arrives whole, once, inside the
-``result`` event (``data.reply``) and again in the terminal message snapshot.
-These models cover the events a client actually receives; the three
-server-intercepted names (``execution_failed``, ``cancelled``,
-``end_of_stream``) never reach the wire as events — they are converted to a
-terminal ``Message`` snapshot by the backend, handled in the stream layer.
-"""
+# Progress events, not tokens. Lines without a correlation_id are not events.
 
 from __future__ import annotations
 
@@ -181,15 +172,7 @@ _known_adapter: TypeAdapter[_Known] = TypeAdapter(_Known)
 
 
 def parse_event(obj: dict[str, Any]) -> AnyEvent:
-    """Parse one decoded JSONL event line into a typed event.
-
-    Unknown event names degrade to :class:`UnknownEvent` rather than raising, so
-    server-side additions never break existing SDK versions.
-
-    Note: this handles *event* lines only. Distinguishing events from terminal
-    ``Message`` / ``Partial`` lines (and skipping heartbeats) is the stream
-    layer's job — events are the lines carrying a ``correlation_id``.
-    """
+    # Unknown names become UnknownEvent. Only correlation_id lines are events.
     try:
         return _known_adapter.validate_python(obj)
     except ValidationError:

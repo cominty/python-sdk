@@ -3,7 +3,7 @@
     python examples/06_manage_thread.py
 
 Demonstrates the rest of the threads resource: ``get`` (full history),
-``update`` (partial — only the fields you pass are changed), and ``archive``.
+``update`` (partial: only the fields you pass are changed), and ``archive``.
 """
 
 from __future__ import annotations

@@ -1,10 +1,3 @@
-"""Unit tests for the memory resource: list, create, get, update, delete.
-
-user_id is sourced from the client (set once at construction). Every memory
-endpoint takes it as a query param except POST /memory, which takes it in the
-request body instead.
-"""
-
 from __future__ import annotations
 
 import json

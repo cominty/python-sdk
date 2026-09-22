@@ -82,7 +82,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 [tool.ruff.lint.per-file-ignores]
 # Unshipped dev entrypoints (excluded from the sdist): manual endpoint-poking
 # scripts and the invoke task runner. Real lint (unused imports, bugs) still
-# applies, but full type annotations are needless ceremony here — invoke tasks
+# applies, but full type annotations are needless ceremony here: invoke tasks
 # idiomatically take an unannotated Context.
 "tasks.py" = ["ANN"]
 

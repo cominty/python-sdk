@@ -1,11 +1,3 @@
-"""Opt-in smoke tests against the real API.
-
-Run with credentials in the environment:
-
-    COMINTY_API_KEY=... COMINTY_USER_ID=user_... COMINTY_AGENT_ID=... \\
-        uv run pytest -m integration
-"""
-
 from __future__ import annotations
 
 import os

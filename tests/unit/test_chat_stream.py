@@ -1,10 +1,3 @@
-"""Exhaustive unit tests for the ``AssistantRun`` streaming handle.
-
-Covers: events-only iteration, heartbeat/blank skipping, terminal capture via
-``result``/``text``, single-use semantics, the server-shutdown ``Partial`` path,
-forward-compat for unknown events, and stream-time HTTP errors.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -31,7 +24,7 @@ MakeMessage = Callable[..., dict[str, Any]]
 MakeEvent = Callable[..., dict[str, Any]]
 Jsonl = Callable[..., str]
 
-# A well-formed Cominty (Clerk) user id — see ^user_[A-Za-z0-9]{20,}$ validation.
+# A well-formed Cominty (Clerk) user id: see ^user_[A-Za-z0-9]{20,}$ validation.
 _USER_ID = "user_31HPTBuBvX20xlQNAbvxjOxPbKB"
 
 _COST = {
@@ -57,7 +50,7 @@ def _stream_path(message_id: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Iteration — events only
+# Iteration: events only
 # --------------------------------------------------------------------------- #
 async def test_iterates_events_only_terminal_not_yielded(
     client: AsyncCominty,
@@ -180,7 +173,7 @@ async def test_tracks_last_event_id_for_resume(
 
 
 # --------------------------------------------------------------------------- #
-# result() / text() — terminal capture
+# result() / text(): terminal capture
 # --------------------------------------------------------------------------- #
 async def test_result_returns_terminal_without_manual_iteration(
     client: AsyncCominty,
@@ -449,7 +442,7 @@ async def test_aclose_without_iteration_is_a_noop(
     client: AsyncCominty, ids: SimpleNamespace
 ) -> None:
     run = client.chat.stream(UUID(ids.assistant_msg))
-    await run.aclose()  # never iterated — nothing to close
+    await run.aclose()  # never iterated: nothing to close
 
 
 async def test_context_manager_closes_cleanly(

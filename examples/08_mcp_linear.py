@@ -6,7 +6,7 @@
 Builds on 07: the same custom French executive-briefing agent, but here it pulls
 live context from the **Linear MCP server** instead of being handed the data.
 The agent looks up Hiroshi's tasks in the current sprint, then reports them in
-its own tone — a clean, non-technical French summary for leadership.
+its own tone: a clean, non-technical French summary for leadership.
 
 Prerequisites (configured on the platform, not in code):
 - The Linear MCP server is connected to your org / available to the agent.
@@ -60,7 +60,7 @@ async def main() -> None:
                 )
 
         # Reported in the agent's voice: French, C-level, bullet points.
-        pretty.answer(await run.text(), title="Synthèse sprint — Hiroshi (FR)")
+        pretty.answer(await run.text(), title="Synthèse sprint: Hiroshi (FR)")
 
 
 if __name__ == "__main__":

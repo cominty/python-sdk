@@ -1,5 +1,3 @@
-"""Client construction: user_id is mandatory and validated up front."""
-
 from __future__ import annotations
 
 import pytest

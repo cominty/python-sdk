@@ -23,7 +23,7 @@ try:
     from rich.text import Text
 except ModuleNotFoundError as exc:  # pragma: no cover - example-only guard
     raise SystemExit(
-        "examples need 'rich' — run `uv sync --all-extras --dev` "
+        "examples need 'rich': run `uv sync --all-extras --dev` "
         "(or `pip install rich`)."
     ) from exc
 
@@ -74,7 +74,7 @@ def render(event: events.AnyEvent) -> None:
     # One row per event: never wrap; crop with … on a too-narrow terminal.
     console.print(line, no_wrap=True, crop=True)
 
-    # LLM reasoning can be a long dump; we showed one truncated line above — flag
+    # LLM reasoning can be a long dump; we showed one truncated line above: flag
     # that the rest is hidden so the stream stays scannable.
     if isinstance(event, events.LlmStep):
         full = " ".join(event.data.description.split())

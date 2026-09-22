@@ -1,10 +1,3 @@
-"""Unit tests for ``client.chat.send`` — the follow-up (continue-in-thread) call.
-
-Covers: endpoint + body (user_id sourced from the client, not the caller), the
-streamable handle it returns, and that client-side validation still fires before
-any request.
-"""
-
 from __future__ import annotations
 
 import json

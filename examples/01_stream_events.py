@@ -2,8 +2,8 @@
 
     python examples/01_stream_events.py
 
-Start a thread, then iterate the run to watch the agent work — tool calls, LLM
-steps, and the final result event — as they arrive. Iterating yields *progress
+Start a thread, then iterate the run to watch the agent work (tool calls, LLM
+steps, and the final result event) as they arrive. Iterating yields *progress
 events only*; the finished reply is captured for you and returned by ``text()``.
 """
 

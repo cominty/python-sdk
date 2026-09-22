@@ -1,9 +1,3 @@
-"""Unit tests for the threads resource: list, get, update, archive.
-
-user_id is sourced from the client (set once at construction) and applied to
-``list`` as a query param — never passed per call.
-"""
-
 from __future__ import annotations
 
 import json

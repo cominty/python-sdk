@@ -1,4 +1,4 @@
-# AGENTS.md — Cominty Python SDK Coding Bible
+# AGENTS.md: Cominty Python SDK Coding Bible
 
 This document is the authoritative guide for every coding agent and contributor working on
 `cominty-sdk`. It defines conventions, patterns, and rules that must be followed across the
@@ -8,24 +8,24 @@ entire codebase. Deviations require an explicit, justified comment at the call s
 
 ## 1. Language & Runtime
 
-- **Python 3.9 is the floor.** `requires-python = ">=3.9"` is a promise to users — the source
+- **Python 3.9 is the floor.** `requires-python = ">=3.9"` is a promise to users: the source
   must import and run on 3.9 through 3.13. pyright and ruff are both pinned to `3.9`/`py39`, so
   they will flag any syntax newer than the floor. Your local interpreter (3.13) is irrelevant;
   the floor decides what syntax is legal, not your machine.
-- Use **modern built-in generics** everywhere — `list[str]`, `dict[str, int]`, `tuple[int, ...]`,
+- Use **modern built-in generics** everywhere: `list[str]`, `dict[str, int]`, `tuple[int, ...]`,
   `type[T]`. Never `typing.List`, `typing.Dict`, `typing.Tuple`, etc. (PEP 585 built-in generic
   subscription works at runtime since 3.9.)
 - Use **`from __future__ import annotations`** at the top of **every** module. It stringizes all
   annotations, so `X | Y` unions and built-in generics in *pure type-hint* positions (function
   signatures, variable annotations) are never evaluated at runtime and work on 3.9.
-- **Unions — three cases, know which you're in:**
+- **Unions: three cases, know which you're in:**
   - *Pure type hints* (function args, returns, plain attribute annotations): `X | Y` is fine under
-    the future import — never evaluated at runtime.
+    the future import: never evaluated at runtime.
   - *Pydantic model fields*: `X | Y` and `list[str]` are written as usual, **but Pydantic `eval()`s
     the annotation string at model-build time**, which would `TypeError` on 3.9. We depend on
-    **`eval-type-backport`** (`python_version < "3.10"`) so Pydantic resolves them transparently —
+    **`eval-type-backport`** (`python_version < "3.10"`) so Pydantic resolves them transparently:
     no per-field `Union[...]` needed. This is the one place the future import alone is *not* enough.
-  - *Runtime-evaluated values* — `TypeAlias` right-hand sides, `TypeAdapter(...)`, `cast(...)`,
+  - *Runtime-evaluated values*: `TypeAlias` right-hand sides, `TypeAdapter(...)`, `cast(...)`,
     `isinstance` targets: use **`typing.Union[X, Y]`**. These execute the `|` directly (not via
     Pydantic), so the backport doesn't help and `|` on typing forms `TypeError`s on 3.9.
 
@@ -33,9 +33,9 @@ entire codebase. Deviations require an explicit, justified comment at the call s
 
 ## 2. Typing System
 
-### 2.1 Generics — `TypeVar`, not PEP 695 brackets
+### 2.1 Generics: `TypeVar`, not PEP 695 brackets
 
-PEP 695 `[T]` syntax is **3.12+ only** — it is a hard `SyntaxError` on the 3.9 floor. Declare
+PEP 695 `[T]` syntax is **3.12+ only**: it is a hard `SyntaxError` on the 3.9 floor. Declare
 type variables explicitly with `TypeVar`:
 
 ```python
@@ -53,7 +53,7 @@ class Stack(Generic[T]):
 Import `TypeVar`/`Generic`/`ParamSpec` from `typing_extensions` (a declared dependency) when you
 need features newer than the 3.9 `typing` module; otherwise plain `typing` is fine.
 
-### 2.2 Type aliases — `TypeAlias`, not the `type` statement
+### 2.2 Type aliases: `TypeAlias`, not the `type` statement
 
 The `type X = ...` statement (PEP 695) is also **3.12+ only**. Use an annotated assignment with
 `TypeAlias` from `typing_extensions`, and `Union[...]` for the value (see §1 on runtime unions):
@@ -107,9 +107,9 @@ Prefer `typing.Protocol` (with `runtime_checkable` when needed) over abstract ba
 Use `TypedDict` for dict-shaped data flowing across I/O boundaries (e.g. raw API payloads
 before parsing). Never use `dict[str, Any]` as a return type.
 
-### 2.7 String enums — `(str, Enum)`, not `StrEnum`
+### 2.7 String enums: `(str, Enum)`, not `StrEnum`
 
-`enum.StrEnum` is **3.11+ only**. Subclass `str` and `Enum` instead — it serializes and compares
+`enum.StrEnum` is **3.11+ only**. Subclass `str` and `Enum` instead: it serializes and compares
 identically under Pydantic and works on the floor:
 
 ```python
@@ -136,8 +136,8 @@ API additions.
 
 ### 3.2 Naming
 
-- Request models: `<Action><Resource>Params` — `CreateThreadParams`, `SendMessageParams`.
-- Response models: `<Resource>` or `<Resource>Response` — `Thread`, `Message`, `ChatResponse`.
+- Request models: `<Action><Resource>Params`: `CreateThreadParams`, `SendMessageParams`.
+- Response models: `<Resource>` or `<Resource>Response`: `Thread`, `Message`, `ChatResponse`.
 - No "Model" suffix. No "Data" suffix.
 
 ### 3.3 Location
@@ -183,7 +183,7 @@ class APIError(ComintyError):
 ### 4.3 Rules
 
 - **Raise early, never return `None` on failure.** If a method can't produce its return type,
-  it raises — never returns `None` as a sentinel.
+  it raises: never returns `None` as a sentinel.
 - All raises from the HTTP layer are caught in `_transport.py` and re-raised as `APIError`
   subclasses. Resource methods never catch raw `httpx` exceptions.
 - SDK-level validation errors (wrong arguments, etc.) raise `ValueError` with a message that
@@ -228,8 +228,8 @@ The **only** public API is what `cominty_sdk/__init__.py` re-exports via an expl
 
 ### 6.2 Two enforcement signals (both required)
 
-1. **`__all__`** in every module — governs `import *` and is the canonical list.
-2. **Leading underscore** on every private name — visible at the call site, the load-bearing
+1. **`__all__`** in every module: governs `import *` and is the canonical list.
+2. **Leading underscore** on every private name: visible at the call site, the load-bearing
    deterrent against `from cominty_sdk.client import _retry`.
 
 Public names **never** carry an underscore. Private names **always** do.
@@ -333,7 +333,7 @@ Patch the HTTP layer with `respx`. Every resource method gets a unit test that:
 2. Asserts the returned object is the correct Pydantic type.
 3. Asserts the request URL, method, and body were correct.
 
-No `MagicMock` on the resource classes themselves — test the real resource, fake the transport.
+No `MagicMock` on the resource classes themselves: test the real resource, fake the transport.
 
 ### 9.3 Notebook contract tests
 
@@ -362,9 +362,9 @@ uv run coverage html && open htmlcov/index.html  # annotated per-line HTML repor
 
 CI runs the same suite with `--cov-fail-under=100` and fails the build on any regression. An
 excluded line or branch must carry a `# pragma: no cover` **and** a one-line comment saying
-why it can't be reached through the public API — see `streaming.py`'s `_stream()` guard or
-`resources/memory.py`'s `_Unset.__repr__` for examples. Don't add tests that only exist to
-nudge the percentage; prefer a justified exclusion for genuinely unreachable code.
+why it can't be reached through the public API: see `streaming.py`'s `_stream()` guard for
+an example. Don't add tests that only exist to nudge the percentage; prefer a justified
+exclusion for genuinely unreachable code.
 
 ---
 
@@ -400,7 +400,7 @@ Hatchling bakes that value into the built sdist/wheel's `dist-info` metadata at 
 time.
 
 - `cominty_sdk.__version__` (in `__init__.py` + `__all__`) resolves it back at runtime via
-  `importlib.metadata.version("cominty-sdk")` — it does not hard-code a version anywhere in
+  `importlib.metadata.version("cominty-sdk")`: it does not hard-code a version anywhere in
   the package source.
 - If the package isn't installed (e.g. a raw source checkout with no `uv sync` / `pip install
   -e .`), `importlib.metadata.version()` raises `PackageNotFoundError`; `__init__.py` catches
@@ -415,15 +415,15 @@ uv run invoke --list           # show all tasks
 uv run invoke clean            # remove dist/ build/ *.egg-info (no stale artifacts)
 uv run invoke build            # clean, then `uv build` -> sdist + wheel in dist/
 uv run invoke check            # build, `twine check dist/*`, and print sdist + wheel contents
-uv run invoke publish-test     # check, then upload to TestPyPI (rehearsal — never PyPI)
-uv run invoke release --patch  # bump + validate + commit + tag (see §12.3) — modifies Git state
+uv run invoke publish-test     # check, then upload to TestPyPI (rehearsal: never PyPI)
+uv run invoke release --patch  # bump + validate + commit + tag (see §12.3): modifies Git state
 ```
 
 `check` is the gate to run before cutting a release. It confirms:
 
 1. the sdist/wheel **build** succeeds,
 2. metadata + README **render** (`twine check`),
-3. the artifacts contain **what they should** — `py.typed` is present in the wheel, and the
+3. the artifacts contain **what they should**: `py.typed` is present in the wheel, and the
    sdist contains **no** `legacy/`, `.env`, or `test.py`.
 
 `publish-test` is a full dry run against TestPyPI; verify the upload in a clean env with the
@@ -432,9 +432,9 @@ uv run invoke release --patch  # bump + validate + commit + tag (see §12.3) —
 ### 12.3 Cutting a release (steps)
 
 > **`uv run invoke release` modifies repository files and CREATES A GIT COMMIT AND TAG.**
-> It never pushes and never creates the GitHub Release — that's step 2 below, always manual.
+> It never pushes and never creates the GitHub Release: that's step 2 below, always manual.
 
-1. **Bump, validate, commit, and tag** — pick exactly one mode:
+1. **Bump, validate, commit, and tag**: pick exactly one mode:
 
    ```bash
    uv run invoke release --patch            # X.Y.Z -> X.Y.(Z+1)
@@ -445,19 +445,19 @@ uv run invoke release --patch  # bump + validate + commit + tag (see §12.3) —
 
    The task (`tasks.py`): rejects zero or more than one of the four flags; requires a clean
    working tree, a target version strictly greater than the current one, and no pre-existing
-   `vX.Y.Z` tag — all checked **before** touching any file. It then bumps `pyproject.toml`'s
-   `[project] version` (the only place — see §12.1), regenerates `uv.lock` via `uv lock`, and
+   `vX.Y.Z` tag: all checked **before** touching any file. It then bumps `pyproject.toml`'s
+   `[project] version` (the only place: see §12.1), regenerates `uv.lock` via `uv lock`, and
    runs the same lint/type-check/test/build gate as `uv run invoke check`. If any of that
    fails, the file changes are rolled back and nothing is committed. On success it creates one
    commit (`chore(release): version X.Y.Z`) and one **annotated** tag (`vX.Y.Z`), and prints
-   the exact next commands — it does not run them for you.
-2. **Push, then publish via a GitHub Release** — `git push origin HEAD && git push origin
+   the exact next commands: it does not run them for you.
+2. **Push, then publish via a GitHub Release**: `git push origin HEAD && git push origin
    vX.Y.Z`, then create/publish a Release for that tag (`gh release create vX.Y.Z
    --generate-notes` or the GitHub UI). Publishing the Release is what triggers the `release`
    workflow; a plain tag push does not.
 
 `tests/test_release.py` covers the task itself (patch/minor/major/explicit-version success,
-plus every validation failure) against disposable temp Git repos — never this repository.
+plus every validation failure) against disposable temp Git repos: never this repository.
 
 `uv run invoke publish` (direct upload to real PyPI) exists as a manual fallback only. The
 **preferred** path is the GitHub Release → CI flow below, so no PyPI token lives on a laptop.
@@ -467,8 +467,8 @@ plus every validation failure) against disposable temp Git repos — never this 
 `.github/workflows/release.yml` runs on `release: [published]` and publishes to PyPI with
 **no stored API token**:
 
-1. **build** job — `uv build`, `twine check`, uploads `dist/` as an artifact.
-2. **publish** job — downloads `dist/`, then `pypa/gh-action-pypi-publish` mints a
+1. **build** job: `uv build`, `twine check`, uploads `dist/` as an artifact.
+2. **publish** job: downloads `dist/`, then `pypa/gh-action-pypi-publish` mints a
    short-lived GitHub **OIDC** token (`permissions: id-token: write`, `environment: pypi`),
    PyPI verifies the token's claims against a registered **Trusted Publisher**, and issues a
    one-shot project-scoped upload token.
@@ -482,7 +482,7 @@ One-time PyPI setup (must match the workflow exactly, or PyPI rejects the token)
 | Workflow | `release.yml` |
 | Environment | `pypi` |
 
-Note: `release.yml` builds + `twine check`s but does **not** run the test suite — tests run
+Note: `release.yml` builds + `twine check`s but does **not** run the test suite: tests run
 in `ci.yml` on push/PR to `main`/`dev`. Only merge to `main` through green CI so a Release
 never ships untested code.
 

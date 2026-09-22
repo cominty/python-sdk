@@ -1,7 +1,3 @@
-"""Unit tests for the low-level transport: timeout/network error mapping on
-both the plain-request and streaming paths, and JSONL line tolerance.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -21,7 +17,7 @@ Jsonl = Callable[..., str]
 
 
 # --------------------------------------------------------------------------- #
-# request() — timeout / network errors
+# request(): timeout / network errors
 # --------------------------------------------------------------------------- #
 async def test_request_timeout_raises_connection_error(
     client: AsyncCominty, mock_api: respx.MockRouter
@@ -42,7 +38,7 @@ async def test_request_network_error_raises_connection_error(
 
 
 # --------------------------------------------------------------------------- #
-# stream_lines() — timeout / network errors
+# stream_lines(): timeout / network errors
 # --------------------------------------------------------------------------- #
 async def test_stream_timeout_raises_connection_error(
     client: AsyncCominty, mock_api: respx.MockRouter, ids: SimpleNamespace
