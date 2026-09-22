@@ -14,11 +14,14 @@ with a small, fully-typed surface that's the same on Python 3.9 through 3.13.
 import asyncio
 from cominty_sdk import AsyncCominty
 
+
 async def main() -> None:
-    async with AsyncCominty() as client:          # reads COMINTY_API_KEY + COMINTY_USER_ID
-        run = await client.chat.start(agent_id="__cominty_agents::agent.chat",
-                                      message="What is Cominty?")
+    async with AsyncCominty() as client:  # reads COMINTY_API_KEY + COMINTY_USER_ID
+        run = await client.chat.start(
+            agent_id="__cominty_agents::agent.chat", message="What is Cominty?"
+        )
         print(await run.text())
+
 
 asyncio.run(main())
 ```
@@ -63,7 +66,7 @@ export COMINTY_USER_ID="user_..."
 ```
 
 ```python
-async with AsyncCominty() as client:   # picks both up from the environment
+async with AsyncCominty() as client:  # picks both up from the environment
     ...
 ```
 
@@ -90,7 +93,7 @@ to the assistant's in-progress reply. From there, pick the style you need.
 
 ```python
 run = await client.chat.start(agent_id=AGENT_ID, message="Give me one fun fact.")
-print(await run.text())              # blocks until the agent finishes
+print(await run.text())  # blocks until the agent finishes
 ```
 
 `await run.result()` gives the full `Message` (status, files, structured output,
@@ -114,7 +117,7 @@ async for event in run:
     elif isinstance(event, events.Result):
         print(f"cost {event.data.cost.total}")
 
-print("FINAL:", await run.text())    # available after the stream drains
+print("FINAL:", await run.text())  # available after the stream drains
 ```
 
 > A run's stream is single-use: iterate it **or** await its result: the result
@@ -130,7 +133,9 @@ first = await client.chat.start(agent_id=AGENT_ID, message="Pick a language.")
 await first.text()
 
 second = await client.chat.send(
-    first.thread.id, agent_id=AGENT_ID, message="Now show hello-world in it.",
+    first.thread.id,
+    agent_id=AGENT_ID,
+    message="Now show hello-world in it.",
 )
 print(await second.text())
 ```
@@ -162,8 +167,8 @@ print(await reply.text())
 for t in await client.threads.list(limit=20):
     print(t.created_at, t.name, t.id)
 
-await client.threads.list(terms=["invoice"])     # free-text search
-await client.threads.list(limit=10, page=1)       # paginate (zero-based)
+await client.threads.list(terms=["invoice"])  # free-text search
+await client.threads.list(limit=10, page=1)  # paginate (zero-based)
 
 # Load one thread's full history
 thread = await client.threads.get(thread_id)
@@ -289,18 +294,18 @@ Every error is a subclass of `ComintyError`:
 
 ```python
 from cominty_sdk import (
-    ComintyError,        # base: catch-all
-    APIError,            # any 4xx/5xx; carries .status_code and a typed .error body
-    AuthError,           # 401
-    PermissionError,     # 403
-    NotFoundError,       # 404
-    ConflictError,       # 409
-    RateLimitError,      # 429: exposes .reset_at
-    ServerError,         # 5xx
+    ComintyError,  # base: catch-all
+    APIError,  # any 4xx/5xx; carries .status_code and a typed .error body
+    AuthError,  # 401
+    PermissionError,  # 403
+    NotFoundError,  # 404
+    ConflictError,  # 409
+    RateLimitError,  # 429: exposes .reset_at
+    ServerError,  # 5xx
     APIConnectionError,  # network failure / timeout, no response
-    StreamInterrupted,   # server shut down mid-stream: carries the .partial Message
-    InvalidParams,       # client-side validation failed: .errors lists each problem
-    SDKError,            # unexpected SDK-internal condition
+    StreamInterrupted,  # server shut down mid-stream: carries the .partial Message
+    InvalidParams,  # client-side validation failed: .errors lists each problem
+    SDKError,  # unexpected SDK-internal condition
 )
 
 try:

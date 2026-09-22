@@ -43,7 +43,9 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
+
 def identity(x: T) -> T: ...
+
 
 class Stack(Generic[T]):
     def push(self, item: T) -> None: ...
@@ -77,9 +79,10 @@ from typing_extensions import ParamSpec
 P = ParamSpec("P")
 R = TypeVar("R")
 
+
 def retry(fn: Callable[P, R]) -> Callable[P, R]:
-    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        ...
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R: ...
+
     return wrapper  # type: ignore[return-value]  # only here, where unavoidable
 ```
 
@@ -90,6 +93,7 @@ so IDEs infer the correct type at each call site:
 
 ```python
 from typing import overload, Literal
+
 
 @overload
 async def send(self, *, stream: Literal[False] = ...) -> ChatResponse: ...
@@ -114,6 +118,7 @@ identically under Pydantic and works on the floor:
 
 ```python
 from enum import Enum
+
 
 class MessageRole(str, Enum):
     user = "user"
@@ -175,6 +180,7 @@ class APIErrorBody(BaseModel):
     message: str
     details: dict[str, object] | None = None
 
+
 class APIError(ComintyError):
     status_code: int
     error: APIErrorBody
@@ -205,7 +211,7 @@ Streaming methods return a `StreamHandle` object, not a raw iterator:
 ```python
 class StreamHandle[EventT]:
     async def events(self) -> AsyncIterator[EventT]: ...
-    async def text(self) -> str: ...          # accumulates all text deltas
+    async def text(self) -> str: ...  # accumulates all text deltas
     async def __aiter__(self) -> AsyncIterator[EventT]: ...  # delegates to events()
 ```
 
