@@ -1,0 +1,30 @@
+# This is to address https://github.com/orgs/community/discussions/5524
+name: Fast Forward Merge
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  merge:
+    name: Fast Forward
+    if: github.event.issue.pull_request != '' && contains(github.event.comment.body, '/merge')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Fast Forward PR
+        uses: cominty/fast-forward-js-action@d2e1f31b37078f9f1be14aa4b6ca7dca1b1544c2
+        with:
+          # We use a PAT so pushing the fast-forwarded commits to main still
+          # triggers ci.yml (the GITHUB_TOKEN's own pushes never re-trigger
+          # workflows). /merge-no-deploy fast-forwards without that PAT, so
+          # it does not re-trigger anything.
+          # Links:
+          #     - https://github.com/endre-spotlab/fast-forward-js-action/issues/36#issuecomment-1493006429
+          #     - https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/triggering-a-workflow#triggering-a-workflow-from-a-workflow
+          GITHUB_TOKEN: ${{ contains(github.event.comment.body, '/merge-no-deploy') && secrets.GITHUB_TOKEN || secrets.FAST_FORWARD_MERGE_PAT }}
+          success_message: "Success! Fast forwarded ***target_base*** to ***source_head***! ```git checkout target_base && git merge source_head --ff-only```"
+          failure_message: "Failed! Cannot do fast forward!"
+          status_name: fast-forward-merge
+          update_status: true
