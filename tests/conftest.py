@@ -57,18 +57,23 @@ def make_message() -> Callable[..., dict[str, Any]]:
         content: str = "",
         status: str = "success",
         live: bool = False,
+        agent: dict[str, Any] | str | None = None,
     ) -> dict[str, Any]:
+        if agent is None and role == "assistant":
+            agent = {"id": "agt_1", "name": "Support"}
         return {
             "id": id,
             "thread_id": THREAD_ID,
             "role": role,
             "content": content,
+            "error_code": None,
             "questions": None,
             "live": live,
             "status": status,
             "events": None,
             "structured_output": None,
             "files": [],
+            "agent": agent,
         }
 
     return _make
@@ -99,8 +104,8 @@ def make_thread(
             "name": name,
             "created_at": "2026-06-28T10:00:00Z",
             "live": True,
-            "agent": {"id": "agt_1", "name": "Support"},
             "starred": False,
+            "inception": "conversational",
             "project_id": None,
             "messages": messages,
         }

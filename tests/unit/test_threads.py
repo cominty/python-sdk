@@ -22,8 +22,8 @@ def _summary(name: str = "A thread") -> dict[str, Any]:
         "name": name,
         "created_at": "2026-06-28T10:00:00Z",
         "live": False,
-        "agent": {"id": "agt_1", "name": "Support"},
         "starred": False,
+        "inception": "conversational",
         "project_id": None,
     }
 

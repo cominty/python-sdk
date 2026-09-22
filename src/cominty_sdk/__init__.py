@@ -33,6 +33,7 @@ from .models.chat import (
     StartChatOptions,
     StartChatParams,
     Thread,
+    ThreadInception,
     ThreadSummary,
     UpdateThreadParams,
 )
@@ -83,6 +84,7 @@ __all__ = [
     "StartChatOptions",
     "StartChatParams",
     "Thread",
+    "ThreadInception",
     "ThreadSummary",
     "UpdateThreadParams",
     "MemoryFileCreate",

@@ -14,6 +14,7 @@ from .chat import (
     StartChatOptions,
     StartChatParams,
     Thread,
+    ThreadInception,
     ThreadSummary,
 )
 from .memory import MemoryFileCreate, MemoryFileOut, MemoryFileSummaryOut, MemoryFileUpdate
@@ -36,5 +37,6 @@ __all__ = [
     "StartChatOptions",
     "StartChatParams",
     "Thread",
+    "ThreadInception",
     "ThreadSummary",
 ]

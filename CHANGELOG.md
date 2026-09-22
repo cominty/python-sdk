@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `Message.agent`: the agent that handled that message (`Agent | Literal["ARCHIVED"] | None`;
+  `"ARCHIVED"` if the original agent has since been deleted). `Message.error_code`: set when
+  the message failed for a known reason (e.g. `"budget_exhausted"`), typed as a plain `str`
+  since the API adds new codes over time. `ThreadSummary.inception`: `"conversational"` or
+  `"routine"`, exposed as the new `ThreadInception` enum.
 - `client.memory`: full async CRUD for memory files, scoped to a
   caller-chosen **namespace** (a bag name, at most 128 characters, never
   trimmed): `list(namespace=None)`, `list_namespaces()`, `create()`, `get()`,
@@ -58,6 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - `client.memory`'s methods no longer send `user_id`: memory files are
   scoped by `namespace`, not by the end user.
+- `ThreadSummary.agent` (and `Thread.agent`, since `Thread` extends it): the API no longer
+  returns an agent on the thread itself. Use `Message.agent` on each message instead.
 
 ## [0.1.1] - 2026-06-18
 

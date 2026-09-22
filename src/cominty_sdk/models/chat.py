@@ -16,6 +16,7 @@ __all__ = [
     "MessageRole",
     "MessageStatus",
     "ContentOrigin",
+    "ThreadInception",
     "DisablableTool",
     "UserId",
     "validate_user_id",
@@ -61,6 +62,11 @@ class MessageStatus(str, Enum):
 class ContentOrigin(str, Enum):
     user = "user"
     agent = "agent"
+
+
+class ThreadInception(str, Enum):
+    conversational = "conversational"
+    routine = "routine"
 
 
 # Cominty user ids are Clerk-issued: "user_" + a base58-ish token,
@@ -191,6 +197,10 @@ class Message(BaseModel):
     thread_id: UUID
     role: MessageRole
     content: str
+    error_code: str | None
+    """Set when the message failed for a known reason (e.g. ``"budget_exhausted"``).
+    Left as ``str`` rather than a closed enum since the API adds new codes
+    over time and this is a lenient response model."""
     questions: list[Question] | None
     live: bool
     status: MessageStatus
@@ -198,6 +208,9 @@ class Message(BaseModel):
     """Raw persisted event log (not the typed stream events)."""
     structured_output: dict[str, Any] | None
     files: list[ConversationFile]
+    agent: Agent | Literal["ARCHIVED"] | None
+    """The agent that handled this message. ``"ARCHIVED"`` if the original
+    agent has since been deleted; ``None`` before one is assigned."""
 
 
 class ThreadSummary(BaseModel):
@@ -207,8 +220,8 @@ class ThreadSummary(BaseModel):
     name: str
     created_at: datetime
     live: bool
-    agent: Agent
     starred: bool
+    inception: ThreadInception
     project_id: str | None = None
 
 

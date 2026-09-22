@@ -10,6 +10,7 @@ import pytest
 import respx
 
 from cominty_sdk import (
+    Agent,
     AsyncCominty,
     AuthError,
     ConflictError,
@@ -51,7 +52,9 @@ async def test_returns_started_chat_with_thread_and_reply(
     assert isinstance(run, StartedChat)
     assert str(run.thread.id) == ids.thread
     assert str(run.message_id) == ids.assistant_msg  # the live assistant reply
-    assert run.thread.agent.name == "Support"
+    agent = run.thread.messages[-1].agent
+    assert isinstance(agent, Agent)
+    assert agent.name == "Support"
 
 
 async def test_thread_is_non_optional_on_started_chat(
