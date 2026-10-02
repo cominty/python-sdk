@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-15
+
+### Added
+- Capabilities. `chat.start(..., thread_capabilities=AgentCapabilities(...))` overrides some
+  of the agent's capabilities for the thread, frozen for its lifetime (not accepted on
+  `chat.send`). `message_scope=MessageScope(...)` on `start` and `send` turns a
+  capability on or off, or narrows its allowlist, for one message (sent as `message.scope`).
+  Every capability is an explicit object with a required activation:
+  `WebCapability`, `IndexedDocumentsCapability`, `McpCapability`, `SkillsCapability`,
+  `ImageGenerationCapability`, `VideoGenerationCapability`, `MusicGenerationCapability`
+  (`"always"`, `"on_request"` or `"never"`; skills take `"always"` or `"never"`). Message
+  scopes are `WebScope`, `IndexedDocumentsScope`, `McpScope`, `ImageGenerationScope`,
+  `VideoGenerationScope`, `MusicGenerationScope`, each with a required `enabled`. There are no
+  shortcuts such as `web=True` or `web="on_request"`. Filters (`source_ids`, `document_ids`,
+  `connections`, `include`) default to the new `ALL` (`"*"`, no restriction), which can also be
+  passed explicitly; `None`, `[]` and `"*"` inside a list raise `InvalidParams`, and so does a
+  filter combined with `"never"` or `enabled=False`.
+- `MemoryCapability(activation="always", namespace=...)` / `MemoryCapability(activation="never")`
+  in `AgentCapabilities(memory=...)`: sets the thread's memory bag (1 to 128 characters), or
+  runs it without memory. Without a `memory` entry, the thread uses the agent's namespace, or
+  no memory if the agent has none.
+- New exports: `ALL`, `AgentCapabilities`, `MessageScope`, the `*Capability` and `*Scope`
+  classes above, and `MemoryCapability`.
+- `examples/11_capabilities.py`.
+
+### Removed
+- BREAKING: `source_ids`, `document_ids` and `disabled_tools` on `chat.start` / `chat.send`,
+  plus `DisablableTool`, `HumanMessage.source_ids/document_ids/disabled_tools`. Migrate to
+  `message_scope`:
+  `disabled_tools=["web"]` -> `MessageScope(web=WebScope(enabled=False))`;
+  `"company_documents"` -> `indexed_documents=IndexedDocumentsScope(enabled=False)`;
+  `"mcp:*"` -> `mcp=McpScope(enabled=False)`;
+  `"mcp:notion"` -> `mcp=McpScope(enabled=True, connections=[<connections to keep>])`;
+  `source_ids=[101]` -> `indexed_documents=IndexedDocumentsScope(enabled=True, source_ids=[101])`;
+  `document_ids=[...]` -> `IndexedDocumentsScope(enabled=True, document_ids=[...])`.
+- BREAKING: `memory_namespace` on `chat.start`, and `StartChatOptions.memory_namespace`. The
+  memory bag is now a capability, like the others. Migrate:
+  `memory_namespace="support-bot"` ->
+  `thread_capabilities=AgentCapabilities(memory=MemoryCapability(activation="always", namespace="support-bot"))`.
+
 ## [0.5.0] - 2026-10-07
 
 ### Added
@@ -151,7 +191,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial async client `AsyncCominty` covering threads, chat, messages
   (send/stream/export/cancel), files (upload/download), usage, and API tokens.
 
-[Unreleased]: https://github.com/cominty/python-sdk/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/cominty/python-sdk/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/cominty/python-sdk/compare/v0.5.0...v1.0.0
 [0.5.0]: https://github.com/cominty/python-sdk/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/cominty/python-sdk/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/cominty/python-sdk/compare/v0.2.0...v0.3.0

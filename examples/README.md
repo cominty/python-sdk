@@ -36,5 +36,6 @@ python examples/01_stream_events.py
 | [`08_mcp_linear.py`](08_mcp_linear.py) | Custom agent pulls live context from the Linear MCP server |
 | [`09_memory.py`](09_memory.py) | Create, list, read, update, and delete a memory file |
 | [`10_max_steps.py`](10_max_steps.py) | Cap tool rounds per message with `max_steps`, then continue past the cap |
+| [`11_capabilities.py`](11_capabilities.py) | Thread and message capabilities |
 
 > Shared client setup lives in [`_shared.py`](_shared.py).

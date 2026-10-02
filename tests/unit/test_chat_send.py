@@ -9,7 +9,15 @@ import httpx
 import pytest
 import respx
 
-from cominty_sdk import SERVER_DEFAULT, AssistantRun, AsyncCominty, InvalidParams
+from cominty_sdk import (
+    SERVER_DEFAULT,
+    AssistantRun,
+    AsyncCominty,
+    IndexedDocumentsScope,
+    InvalidParams,
+    McpScope,
+    MessageScope,
+)
 
 # Mirror the canonical ids in conftest (tests/ is not an importable package).
 THREAD_ID = "11111111-1111-1111-1111-111111111111"
@@ -126,7 +134,34 @@ async def test_validation_fires_before_request(
     route = mock_api.post(f"/chat/{THREAD_ID}")
 
     with pytest.raises(InvalidParams) as exc:
-        await client.chat.send(THREAD_ID, message="hi", agent_id="a", disabled_tools=["bogus"])
+        await client.chat.send(THREAD_ID, message="x" * 30_001, agent_id="a")
 
     assert not route.called
     assert str(exc.value).startswith("Invalid parameters for chat.send:")
+
+
+async def test_sends_message_scope(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_message: MakeMessage
+) -> None:
+    route = mock_api.post(f"/chat/{THREAD_ID}").mock(
+        return_value=httpx.Response(
+            200, json=make_message(id=ASSISTANT_MSG_ID, role="assistant", live=True)
+        )
+    )
+
+    await client.chat.send(
+        THREAD_ID,
+        message="only 2024",
+        agent_id="agt_1",
+        message_scope=MessageScope(
+            indexed_documents=IndexedDocumentsScope(enabled=True, source_ids=[101]),
+            mcp=McpScope(enabled=False),
+        ),
+    )
+
+    body = json.loads(route.calls.last.request.content)
+    assert body["message"]["scope"] == {
+        "indexed_documents": {"enabled": True, "source_ids": [101], "document_ids": "*"},
+        "mcp": {"enabled": False},
+    }
+    assert body["options"] == {"agent_id": "agt_1", "user_id": USER_ID}

@@ -19,6 +19,8 @@ import asyncio
 import _pretty as pretty
 from _shared import CUSTOM_AGENT_ID, make_client
 
+from cominty_sdk import IndexedDocumentsScope, McpScope, MessageScope, WebScope
+
 # Deliberately dense and technical: the agent's job is to make this legible to
 # a non-technical executive, in French.
 TECHNICAL_INPUT = """\
@@ -50,7 +52,11 @@ async def main() -> None:
             message=TECHNICAL_INPUT,
             # Pure transformation: no tools needed, so turn them off for speed
             # and determinism.
-            disabled_tools=["web", "company_documents", "mcp:*"],
+            message_scope=MessageScope(
+                web=WebScope(enabled=False),
+                indexed_documents=IndexedDocumentsScope(enabled=False),
+                mcp=McpScope(enabled=False),
+            ),
         )
 
         async for event in run:

@@ -6,9 +6,9 @@ from uuid import UUID
 from pydantic import ValidationError
 
 from cominty_sdk.exceptions import InvalidParams, SDKError
+from cominty_sdk.models.capabilities import AgentCapabilities, MessageScope
 from cominty_sdk.models.chat import (
     SERVER_DEFAULT,
-    DisablableTool,
     MaxSteps,
     Message,
     MessageRole,
@@ -35,10 +35,8 @@ class ChatResource:
         message: str,
         name: str | None = None,
         file_ids: list[str] | None = None,
-        source_ids: list[int] | None = None,
-        document_ids: list[str] | None = None,
-        disabled_tools: list[DisablableTool] | None = None,
-        memory_namespace: str | None = None,
+        thread_capabilities: AgentCapabilities | None = None,
+        message_scope: MessageScope | None = None,
         max_steps: MaxSteps = SERVER_DEFAULT,
     ) -> StartedChat:
         """
@@ -52,12 +50,14 @@ class ChatResource:
             message (str): First user message.
             name (str | None): Thread title. Omit it to leave the thread unnamed.
             file_ids (list[str] | None): Uploaded file ids attached to the message.
-            source_ids (list[int] | None): Connected source ids attached to the message.
-            document_ids (list[str] | None): Document ids attached to the message.
-            disabled_tools (list[DisablableTool] | None): Tools the agent must not use.
-            memory_namespace (str | None): Memory bag for this thread, frozen for its
-                lifetime. Omit to run with no memory tools, unless the agent has its
-                own namespace set. A follow-up cannot change it.
+            thread_capabilities (AgentCapabilities | None): Overrides some of the
+                agent's capabilities for this thread, frozen for its lifetime. Each
+                capability you pass replaces the agent's; the others keep the agent's
+                value. A follow-up cannot change it. ``memory`` freezes the thread's
+                memory bag. With capabilities but no ``memory``, the thread uses the
+                agent's namespace, or runs without memory if the agent has none.
+            message_scope (MessageScope | None): Turns a capability on
+                or off, or narrows its allowlist, for this first message only.
             max_steps (MaxSteps): Cap on the agent's tool rounds for this
                 message, an integer ``>= 1``. Leave it at ``SERVER_DEFAULT`` to let the
                 server apply its own default (60 today, subject to change). Reaching the
@@ -76,10 +76,8 @@ class ChatResource:
             message=message,
             name=name,
             file_ids=file_ids,
-            source_ids=source_ids,
-            document_ids=document_ids,
-            disabled_tools=disabled_tools,
-            memory_namespace=memory_namespace,
+            thread_capabilities=thread_capabilities,
+            message_scope=message_scope,
             max_steps=max_steps,
             context="chat.start",
         )
@@ -95,9 +93,7 @@ class ChatResource:
         message: str,
         agent_id: str,
         file_ids: list[str] | None = None,
-        source_ids: list[int] | None = None,
-        document_ids: list[str] | None = None,
-        disabled_tools: list[DisablableTool] | None = None,
+        message_scope: MessageScope | None = None,
         max_steps: MaxSteps = SERVER_DEFAULT,
     ) -> AssistantRun:
         """
@@ -114,9 +110,9 @@ class ChatResource:
             message (str): Follow-up text.
             agent_id (str): Managed agent that handles this turn.
             file_ids (list[str] | None): Uploaded file ids attached to the message.
-            source_ids (list[int] | None): Connected source ids attached to the message.
-            document_ids (list[str] | None): Document ids attached to the message.
-            disabled_tools (list[DisablableTool] | None): Tools the agent must not use.
+            message_scope (MessageScope | None): Turns a capability on
+                or off, or narrows its allowlist, for this message only. Limited to
+                what the thread was started with.
             max_steps (MaxSteps): Cap on the agent's tool rounds for this
                 message, an integer ``>= 1``. The cap is per message, not per thread:
                 a follow-up that leaves it at ``SERVER_DEFAULT`` runs with the server
@@ -135,10 +131,8 @@ class ChatResource:
             message=message,
             name=None,
             file_ids=file_ids,
-            source_ids=source_ids,
-            document_ids=document_ids,
-            disabled_tools=disabled_tools,
-            memory_namespace=None,
+            thread_capabilities=None,
+            message_scope=message_scope,
             max_steps=max_steps,
             context="chat.send",
         )
@@ -167,10 +161,8 @@ class ChatResource:
         message: str,
         name: str | None,
         file_ids: list[str] | None,
-        source_ids: list[int] | None,
-        document_ids: list[str] | None,
-        disabled_tools: list[DisablableTool] | None,
-        memory_namespace: str | None,
+        thread_capabilities: AgentCapabilities | None,
+        message_scope: MessageScope | None,
         max_steps: MaxSteps,
         context: str,
     ) -> dict[str, object]:
@@ -180,7 +172,7 @@ class ChatResource:
         options: dict[str, object] = {
             "agent_id": agent_id,
             "user_id": self._user_id,
-            "memory_namespace": memory_namespace,
+            "capabilities": thread_capabilities,
         }
         # The sentinel leaves the key out so the server default applies. An
         # explicit None is passed through on purpose: the model rejects it.
@@ -193,9 +185,7 @@ class ChatResource:
                     "message": {
                         "content": message,
                         "file_ids": file_ids,
-                        "source_ids": source_ids,
-                        "document_ids": document_ids,
-                        "disabled_tools": disabled_tools,
+                        "scope": message_scope,
                     },
                     "options": options,
                 }

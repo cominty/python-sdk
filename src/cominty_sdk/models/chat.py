@@ -11,12 +11,11 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    StringConstraints,
     field_validator,
 )
 from typing_extensions import TypeAlias
 
-from .memory import MemoryNamespace
+from .capabilities import AgentCapabilities, MessageScope
 
 __all__ = [
     # enums / aliases
@@ -24,11 +23,8 @@ __all__ = [
     "MessageStatus",
     "ContentOrigin",
     "ThreadInception",
-    "DisablableTool",
     "UserId",
     "validate_user_id",
-    "DISABLE_MCP_PREFIX",
-    "DISABLE_ALL_MCP",
     "SERVER_DEFAULT",
     "MaxSteps",
     # request models
@@ -98,13 +94,6 @@ UserId: TypeAlias = Annotated[str, AfterValidator(validate_user_id)]
 typo'd or malformed id fails locally instead of as a server 400/404."""
 
 
-DISABLE_MCP_PREFIX = "mcp:"
-"""Prefix for disabling a single MCP server, e.g. ``"mcp:slack"``."""
-# TODO(mcp): how is this used ?
-DISABLE_ALL_MCP = f"{DISABLE_MCP_PREFIX}*"
-"""Wildcard token that disables every connected MCP server at once."""
-
-
 # Single-member enum: the one sentinel idiom pyright narrows with `is`.
 # typing_extensions.sentinel is not understood by pyright's bundled typeshed.
 class _ServerDefaultType(Enum):
@@ -118,15 +107,6 @@ applies its own default (60 today, subject to change)."""
 MaxSteps: TypeAlias = Union[int, Literal[_ServerDefaultType.SERVER_DEFAULT]]
 """A tool-round cap: an integer ``>= 1``, or ``SERVER_DEFAULT`` to omit it."""
 
-# TODO: include the wildcard * for disable all, can it be with the other literals?
-DisablableTool: TypeAlias = Union[
-    Literal["web", "company_documents"],
-    Annotated[str, StringConstraints(pattern=rf"^{DISABLE_MCP_PREFIX}.+")],
-]
-"""A tool the agent may disable: the built-in ``"web"`` / ``"company_documents"``,
-or an MCP token ``"mcp:<server>"`` (``"mcp:*"`` for all). The MCP arm is regex-
-validated, so arbitrary strings are rejected rather than silently sent."""
-
 
 # --------------------------------------------------------------------------- #
 # Request models  (strict: reject unknown fields, no coercion)
@@ -136,9 +116,7 @@ class HumanMessage(BaseModel):
 
     content: str = Field(max_length=_CONTENT_MAX_LENGTH)
     file_ids: list[str] | None = Field(default=None, max_length=_MAX_FILES)
-    source_ids: list[int] | None = None
-    document_ids: list[str] | None = None
-    disabled_tools: list[DisablableTool] | None = None
+    scope: MessageScope | None = None
 
 
 class StartChatOptions(BaseModel):
@@ -147,9 +125,8 @@ class StartChatOptions(BaseModel):
     agent_id: str
     user_id: UserId
     """Required: the API-token endpoint rejects a missing ``user_id`` with 400."""
-    memory_namespace: MemoryNamespace | None = None
-    """Memory bag for this thread, frozen once the thread starts. Omit to run
-    with no memory tools, unless the agent has its own namespace set."""
+    capabilities: AgentCapabilities | None = None
+    """Thread-level override, frozen once the thread starts. ``start`` only."""
     max_steps: int | None = Field(default=None, ge=1)
     """Tool-round cap for this message only. Omit to let the server apply its
     default. ``None`` is the "omitted" state, never a value: an explicit ``None``

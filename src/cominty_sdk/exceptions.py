@@ -166,7 +166,7 @@ class InvalidParam(TypedDict):
     """One offending parameter in an :class:`InvalidParams` error."""
 
     param: str
-    """The public argument that failed, e.g. ``"disabled_tools[0]"``."""
+    """The public argument that failed, e.g. ``"file_ids[0]"``."""
     message: str
     """Why it failed (the underlying validation message)."""
     input: Any
