@@ -6,8 +6,8 @@ from uuid import UUID
 from pydantic import ValidationError
 
 from cominty_sdk.exceptions import InvalidParams, SDKError
+from cominty_sdk.models.capabilities import AgentCapabilities, MessageScope
 from cominty_sdk.models.chat import (
-    DisablableTool,
     Message,
     MessageRole,
     StartChatParams,
@@ -33,9 +33,8 @@ class ChatResource:
         message: str,
         name: str | None = None,
         file_ids: list[str] | None = None,
-        source_ids: list[int] | None = None,
-        document_ids: list[str] | None = None,
-        disabled_tools: list[DisablableTool] | None = None,
+        thread_capabilities: AgentCapabilities | None = None,
+        message_scope: MessageScope | None = None,
         memory_namespace: str | None = None,
     ) -> StartedChat:
         """
@@ -49,9 +48,12 @@ class ChatResource:
             message (str): First user message.
             name (str | None): Thread title. Omit it to leave the thread unnamed.
             file_ids (list[str] | None): Uploaded file ids attached to the message.
-            source_ids (list[int] | None): Connected source ids attached to the message.
-            document_ids (list[str] | None): Document ids attached to the message.
-            disabled_tools (list[DisablableTool] | None): Tools the agent must not use.
+            thread_capabilities (AgentCapabilities | None): Overrides some of the
+                agent's capabilities for this thread, frozen for its lifetime. Each
+                capability you pass replaces the agent's; the others keep the agent's
+                value. A follow-up cannot change it.
+            message_scope (MessageScope | None): Turns a capability on
+                or off, or narrows its allowlist, for this first message only.
             memory_namespace (str | None): Memory bag for this thread, frozen for its
                 lifetime. Omit to run with no memory tools, unless the agent has its
                 own namespace set. A follow-up cannot change it.
@@ -67,9 +69,8 @@ class ChatResource:
             message=message,
             name=name,
             file_ids=file_ids,
-            source_ids=source_ids,
-            document_ids=document_ids,
-            disabled_tools=disabled_tools,
+            thread_capabilities=thread_capabilities,
+            message_scope=message_scope,
             memory_namespace=memory_namespace,
             context="chat.start",
         )
@@ -85,9 +86,7 @@ class ChatResource:
         message: str,
         agent_id: str,
         file_ids: list[str] | None = None,
-        source_ids: list[int] | None = None,
-        document_ids: list[str] | None = None,
-        disabled_tools: list[DisablableTool] | None = None,
+        message_scope: MessageScope | None = None,
     ) -> AssistantRun:
         """
         Send a follow-up in an existing thread.
@@ -103,9 +102,9 @@ class ChatResource:
             message (str): Follow-up text.
             agent_id (str): Managed agent that handles this turn.
             file_ids (list[str] | None): Uploaded file ids attached to the message.
-            source_ids (list[int] | None): Connected source ids attached to the message.
-            document_ids (list[str] | None): Document ids attached to the message.
-            disabled_tools (list[DisablableTool] | None): Tools the agent must not use.
+            message_scope (MessageScope | None): Turns a capability on
+                or off, or narrows its allowlist, for this message only. Limited to
+                what the thread was started with.
 
         Returns:
             AssistantRun: Handle for the new assistant reply.
@@ -118,9 +117,8 @@ class ChatResource:
             message=message,
             name=None,
             file_ids=file_ids,
-            source_ids=source_ids,
-            document_ids=document_ids,
-            disabled_tools=disabled_tools,
+            thread_capabilities=None,
+            message_scope=message_scope,
             memory_namespace=None,
             context="chat.send",
         )
@@ -149,9 +147,8 @@ class ChatResource:
         message: str,
         name: str | None,
         file_ids: list[str] | None,
-        source_ids: list[int] | None,
-        document_ids: list[str] | None,
-        disabled_tools: list[DisablableTool] | None,
+        thread_capabilities: AgentCapabilities | None,
+        message_scope: MessageScope | None,
         memory_namespace: str | None,
         context: str,
     ) -> dict[str, object]:
@@ -165,13 +162,12 @@ class ChatResource:
                     "message": {
                         "content": message,
                         "file_ids": file_ids,
-                        "source_ids": source_ids,
-                        "document_ids": document_ids,
-                        "disabled_tools": disabled_tools,
+                        "capabilities": message_scope,
                     },
                     "options": {
                         "agent_id": agent_id,
                         "user_id": self._user_id,
+                        "capabilities": thread_capabilities,
                         "memory_namespace": memory_namespace,
                     },
                 }

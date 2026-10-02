@@ -234,6 +234,55 @@ A few other things worth knowing:
 - `chat.start(..., memory_namespace=...)` attaches a thread to a bag; the
   bag is frozen once the thread starts (see [Message parameters](#message-parameters)).
 
+### Capabilities
+
+A capability is something the agent may use: `web`, `indexed_documents`, `mcp`, `skills`,
+`image_generation`, `video_generation`, `music_generation`. The keyword name tells you the scope:
+
+```python
+from cominty_sdk import (
+    ALL,
+    AgentCapabilities,
+    IndexedDocumentsFilter,
+    IndexedDocumentsPolicy,
+    McpPolicy,
+    MessageScope,
+)
+
+run = await client.chat.start(
+    agent_id=AGENT_ID,
+    message="Summarize every board deck",
+    thread_capabilities=AgentCapabilities(  # frozen for the thread, start only
+        web="never",
+        indexed_documents=IndexedDocumentsPolicy(
+            activation="always", source_ids=ALL, document_ids=ALL
+        ),
+        mcp=McpPolicy(activation="on_request", connections=["linear"]),
+        image_generation="on_request",
+    ),
+    message_scope=MessageScope(image_generation=True),  # this message only
+)
+
+await client.chat.send(
+    run.thread.id,
+    agent_id=AGENT_ID,
+    message="Only deck 2024",
+    message_scope=MessageScope(
+        indexed_documents=IndexedDocumentsFilter(source_ids=[101]), mcp=False
+    ),
+)
+```
+
+- Activation is `"always"` (on by default), `"on_request"` (off until a message enables it) or
+  `"never"` (not installed). A capability you do not pass keeps the agent's value.
+- Filters default to `ALL` (the string `"*"`, no restriction). A capability you send replaces
+  the stored one, so an omitted filter resets to `ALL`. Otherwise pass a non-empty list: `None`,
+  `[]` and a `"*"` inside a list raise `InvalidParams`.
+- Filterable capabilities also accept a bare activation (`mcp="always"`). `"never"` sends
+  nothing else.
+- A message can only narrow what the thread allows. The server answers 422 (`APIError`)
+  when it widens an allowlist or targets a capability the thread does not have.
+
 ## Examples
 
 Runnable scripts for each scenario live in [`examples/`](examples/):
@@ -248,6 +297,7 @@ Runnable scripts for each scenario live in [`examples/`](examples/):
 | [`06_manage_thread.py`](examples/06_manage_thread.py) | Get, rename/star, archive |
 | [`07_custom_agent.py`](examples/07_custom_agent.py) | Call a custom managed agent (your own model + instructions) |
 | [`08_mcp_linear.py`](examples/08_mcp_linear.py) | Custom agent pulls live context from an MCP server (Linear) |
+| [`10_capabilities.py`](examples/10_capabilities.py) | Thread and message capabilities |
 
 They render colored, aligned output with [`rich`](https://github.com/Textualize/rich),
 which ships in the dev extras:
@@ -268,9 +318,8 @@ Both `chat.start` and `chat.send` accept:
 | `message` | `str` | **Required.** The user's message (max 30,000 chars). |
 | `name` | `str` | `start` only: names the new thread. |
 | `file_ids` | `list[str]` | Attach previously-uploaded files (max 5). |
-| `source_ids` | `list[int]` | Restrict retrieval to specific knowledge sources. |
-| `document_ids` | `list[str]` | Restrict retrieval to specific documents. |
-| `disabled_tools` | `list[str]` | Turn tools off: `"web"`, `"company_documents"`, `"mcp:<server>"`, or `"mcp:*"` for all MCP. |
+| `thread_capabilities` | `AgentCapabilities` | `start` only: capability override, frozen for the thread. |
+| `message_scope` | `MessageScope` | Turn capabilities on/off or narrow them for this message. |
 | `memory_namespace` | `str` | `start` only: the memory bag for this thread (max 128 chars), frozen for its lifetime. A follow-up cannot change it. |
 
 Invalid values raise `InvalidParams` **before** any request is sent.

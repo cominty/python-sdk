@@ -3,12 +3,13 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 from typing_extensions import TypeAlias
 
+from .capabilities import AgentCapabilities, MessageScope
 from .memory import MemoryNamespace
 
 __all__ = [
@@ -17,11 +18,8 @@ __all__ = [
     "MessageStatus",
     "ContentOrigin",
     "ThreadInception",
-    "DisablableTool",
     "UserId",
     "validate_user_id",
-    "DISABLE_MCP_PREFIX",
-    "DISABLE_ALL_MCP",
     # request models
     "HumanMessage",
     "StartChatOptions",
@@ -89,22 +87,6 @@ UserId: TypeAlias = Annotated[str, AfterValidator(validate_user_id)]
 typo'd or malformed id fails locally instead of as a server 400/404."""
 
 
-DISABLE_MCP_PREFIX = "mcp:"
-"""Prefix for disabling a single MCP server, e.g. ``"mcp:slack"``."""
-# TODO(mcp): how is this used ?
-DISABLE_ALL_MCP = f"{DISABLE_MCP_PREFIX}*"
-"""Wildcard token that disables every connected MCP server at once."""
-
-# TODO: include the wildcard * for disable all, can it be with the other literals?
-DisablableTool: TypeAlias = Union[
-    Literal["web", "company_documents"],
-    Annotated[str, StringConstraints(pattern=rf"^{DISABLE_MCP_PREFIX}.+")],
-]
-"""A tool the agent may disable: the built-in ``"web"`` / ``"company_documents"``,
-or an MCP token ``"mcp:<server>"`` (``"mcp:*"`` for all). The MCP arm is regex-
-validated, so arbitrary strings are rejected rather than silently sent."""
-
-
 # --------------------------------------------------------------------------- #
 # Request models  (strict: reject unknown fields, no coercion)
 # --------------------------------------------------------------------------- #
@@ -113,9 +95,7 @@ class HumanMessage(BaseModel):
 
     content: str = Field(max_length=_CONTENT_MAX_LENGTH)
     file_ids: list[str] | None = Field(default=None, max_length=_MAX_FILES)
-    source_ids: list[int] | None = None
-    document_ids: list[str] | None = None
-    disabled_tools: list[DisablableTool] | None = None
+    capabilities: MessageScope | None = None
 
 
 class StartChatOptions(BaseModel):
@@ -124,6 +104,8 @@ class StartChatOptions(BaseModel):
     agent_id: str
     user_id: UserId
     """Required: the API-token endpoint rejects a missing ``user_id`` with 400."""
+    capabilities: AgentCapabilities | None = None
+    """Thread-level override, frozen once the thread starts. ``start`` only."""
     memory_namespace: MemoryNamespace | None = None
     """Memory bag for this thread, frozen once the thread starts. Omit to run
     with no memory tools, unless the agent has its own namespace set."""

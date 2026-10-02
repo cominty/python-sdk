@@ -10,11 +10,15 @@ import pytest
 import respx
 
 from cominty_sdk import (
+    ALL,
     Agent,
+    AgentCapabilities,
     AsyncCominty,
     AuthError,
     ConflictError,
     InvalidParams,
+    McpPolicy,
+    MessageScope,
     NotFoundError,
     PermissionError,
     RateLimitError,
@@ -97,17 +101,11 @@ async def test_includes_optional_fields_when_provided(
         message="hi",
         name="My chat",
         file_ids=["f1", "f2"],
-        source_ids=[1, 2],
-        document_ids=["d1"],
-        disabled_tools=["web", "mcp:slack"],
     )
 
     body = json.loads(route.calls.last.request.content)
     assert body["name"] == "My chat"
     assert body["message"]["file_ids"] == ["f1", "f2"]
-    assert body["message"]["source_ids"] == [1, 2]
-    assert body["message"]["document_ids"] == ["d1"]
-    assert body["message"]["disabled_tools"] == ["web", "mcp:slack"]
 
 
 async def test_start_does_not_open_the_stream(
@@ -120,18 +118,6 @@ async def test_start_does_not_open_the_stream(
     # start() only POSTs; the stream opens lazily on iteration, not here.
     assert len(mock_api.calls) == 1
     assert mock_api.calls.last.request.method == "POST"
-
-
-@pytest.mark.parametrize("tool", ["web", "company_documents", "mcp:slack", "mcp:*"])
-async def test_valid_disabled_tools_accepted(
-    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread, tool: str
-) -> None:
-    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
-
-    await client.chat.start(agent_id="a", message="hi", disabled_tools=[tool])
-
-    assert route.called
-    assert json.loads(route.calls.last.request.content)["message"]["disabled_tools"] == [tool]
 
 
 async def test_includes_memory_namespace_when_provided(
@@ -179,36 +165,6 @@ async def test_uses_configured_base_url(make_thread: MakeThread) -> None:
 # --------------------------------------------------------------------------- #
 # Client-side validation: must fail BEFORE any HTTP request
 # --------------------------------------------------------------------------- #
-async def test_invalid_disabled_tool_raises_before_request(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
-    route = mock_api.post("/chat")
-
-    with pytest.raises(InvalidParams) as exc:
-        await client.chat.start(agent_id="a", message="hi", disabled_tools=["bogus"])
-
-    assert not route.called
-    assert len(mock_api.calls) == 0
-    assert any(e["param"] == "disabled_tools[0]" for e in exc.value.errors)
-    assert exc.value.errors[0]["input"] == "bogus"
-
-
-async def test_invalid_source_id_type_raises(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
-    route = mock_api.post("/chat")
-
-    with pytest.raises(InvalidParams) as exc:
-        await client.chat.start(
-            agent_id="a",
-            message="hi",
-            source_ids=["nope"],  # type: ignore[list-item]
-        )
-
-    assert not route.called
-    assert any(e["param"] == "source_ids[0]" for e in exc.value.errors)
-
-
 async def test_content_too_long_raises(client: AsyncCominty, mock_api: respx.MockRouter) -> None:
     route = mock_api.post("/chat")
 
@@ -239,24 +195,23 @@ async def test_multiple_validation_errors_collected(
     with pytest.raises(InvalidParams) as exc:
         await client.chat.start(
             agent_id="a",
-            message="hi",
-            disabled_tools=["bad"],
-            source_ids=["nope"],  # type: ignore[list-item]
+            message="x" * 30_001,
+            file_ids=[1],  # type: ignore[list-item]
         )
 
     params = {e["param"] for e in exc.value.errors}
-    assert {"disabled_tools[0]", "source_ids[0]"} <= params
+    assert {"content", "file_ids[0]"} <= params
     assert len(mock_api.calls) == 0
 
 
 async def test_invalid_params_message_is_clean(client: AsyncCominty) -> None:
     with pytest.raises(InvalidParams) as exc:
-        await client.chat.start(agent_id="a", message="hi", disabled_tools=["bad"])
+        await client.chat.start(agent_id="a", message="x" * 30_001)
 
     text = str(exc.value)
     assert text.startswith("Invalid parameters for chat.start:")
-    assert "disabled_tools[0]" in text
-    assert "got 'bad'" in text  # the offending value is shown
+    assert "content" in text
+    assert "at most 30000" in text  # the constraint is shown
     assert "pydantic" not in text.lower()  # no leaked library internals
 
 
@@ -398,3 +353,40 @@ async def test_picks_last_assistant_message(
     run = await client.chat.start(agent_id="a", message="hi")
 
     assert str(run.message_id) == _ASSISTANT_2
+
+
+# --------------------------------------------------------------------------- #
+# Capabilities
+# --------------------------------------------------------------------------- #
+async def test_sends_thread_capabilities_and_message_scope(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
+) -> None:
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
+
+    await client.chat.start(
+        agent_id="agt_1",
+        message="hi",
+        thread_capabilities=AgentCapabilities(
+            web="never", mcp=McpPolicy(activation="always", connections=ALL)
+        ),
+        message_scope=MessageScope(image_generation=True),
+    )
+
+    body = json.loads(route.calls.last.request.content)
+    assert body["options"]["capabilities"] == {
+        "web": {"activation": "never"},
+        "mcp": {"activation": "always", "connections": "*"},
+    }
+    assert body["message"]["capabilities"] == {"image_generation": {"enabled": True}}
+
+
+async def test_omits_capabilities_by_default(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
+) -> None:
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
+
+    await client.chat.start(agent_id="agt_1", message="hi")
+
+    body = json.loads(route.calls.last.request.content)
+    assert "capabilities" not in body["options"]
+    assert "capabilities" not in body["message"]

@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Capabilities. `chat.start(..., thread_capabilities=AgentCapabilities(...))` overrides some
+  of the agent's capabilities for the thread, frozen for its lifetime (not accepted on
+  `chat.send`). `message_scope=MessageScope(...)` on `start` and `send` turns a
+  capability on or off, or narrows its allowlist, for one message. Filterable capabilities
+  (`indexed_documents`, `mcp`, `skills`) take a bare activation or a policy
+  (`IndexedDocumentsPolicy`, `McpPolicy`, `SkillsPolicy`) whose filters default to the new
+  `ALL` (`"*"`, no restriction); `None`, `[]` and `"*"` inside a list raise `InvalidParams`.
+  New exports: `ALL`, `AgentCapabilities`, `MessageScope`, `IndexedDocumentsFilter`,
+  `IndexedDocumentsPolicy`, `McpPolicy`, `SkillsPolicy`, `Activation`.
 - `Message.agent`: the agent that handled that message (`Agent | Literal["ARCHIVED"] | None`;
   `"ARCHIVED"` if the original agent has since been deleted). `Message.error_code`: set when
   the message failed for a known reason (e.g. `"budget_exhausted"`), typed as a plain `str`
@@ -61,6 +70,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.coverage*`), not just build artifacts.
 
 ### Removed
+- BREAKING: `source_ids`, `document_ids` and `disabled_tools` on `chat.start` / `chat.send`,
+  plus `DisablableTool`, `HumanMessage.source_ids/document_ids/disabled_tools`. Migrate to
+  `message_scope`:
+  `disabled_tools=["web"]` -> `MessageScope(web=False)`;
+  `"company_documents"` -> `indexed_documents=False`; `"mcp:*"` -> `mcp=False`;
+  `"mcp:notion"` -> `mcp=[<connections to keep>]`;
+  `source_ids=[101]` -> `indexed_documents=IndexedDocumentsFilter(source_ids=[101])`;
+  `document_ids=[...]` -> `IndexedDocumentsFilter(document_ids=[...])`.
 - `client.memory`'s methods no longer send `user_id`: memory files are
   scoped by `namespace`, not by the end user.
 - `ThreadSummary.agent` (and `Thread.agent`, since `Thread` extends it): the API no longer

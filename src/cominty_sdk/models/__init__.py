@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+from .capabilities import (
+    ALL,
+    Activation,
+    AgentCapabilities,
+    IndexedDocumentsFilter,
+    IndexedDocumentsPolicy,
+    McpPolicy,
+    MessageScope,
+    SkillsPolicy,
+)
 from .chat import (
     Agent,
     ContentOrigin,
     ConversationFile,
-    DisablableTool,
     HumanMessage,
     Message,
     MessageRole,
@@ -20,10 +29,17 @@ from .chat import (
 from .memory import MemoryFileCreate, MemoryFileOut, MemoryFileSummaryOut, MemoryFileUpdate
 
 __all__ = [
+    "ALL",
+    "Activation",
+    "AgentCapabilities",
+    "IndexedDocumentsFilter",
+    "IndexedDocumentsPolicy",
+    "McpPolicy",
+    "MessageScope",
+    "SkillsPolicy",
     "Agent",
     "ContentOrigin",
     "ConversationFile",
-    "DisablableTool",
     "HumanMessage",
     "Message",
     "MessageRole",
