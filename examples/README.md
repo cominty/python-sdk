@@ -15,7 +15,7 @@ export COMINTY_API_KEY="<your API key>"     # platform.cominty.ai -> API keys
 export COMINTY_USER_ID="user_..."           # platform.cominty.ai -> Profile
 # optional:
 export COMINTY_AGENT_ID="__cominty_agents::agent.chat"   # else the default is used
-export COMINTY_BASE_URL="https://ds-dev.cominty.com"     # else production
+export COMINTY_BASE_URL="https://ds-staging.cominty.com"    # staging, else production
 ```
 
 Then run any script from the repo root:

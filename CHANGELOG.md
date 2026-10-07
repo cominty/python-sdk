@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-07
+
 ### Added
 - `chat.start(..., max_steps=...)` and `chat.send(..., max_steps=...)`: cap the
   agent's tool rounds for that one message (integer `>= 1`). The cap is per
@@ -72,10 +74,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.coverage*`), not just build artifacts.
 
 ### Removed
-- `client.memory`'s methods no longer send `user_id`: memory files are
-  scoped by `namespace`, not by the end user.
 - `ThreadSummary.agent` (and `Thread.agent`, since `Thread` extends it): the API no longer
   returns an agent on the thread itself. Use `Message.agent` on each message instead.
+
+## [0.4.0] - 2026-06-30
+
+### Added
+- `client.threads`: `list()`, `get()`, `update()` and `archive()` to manage
+  existing threads. New `UpdateThreadParams` export.
+- `chat.send(thread_id, message=..., agent_id=...)`: send a follow-up message
+  in an existing thread, for example to answer an agent's question.
+- `StartedChat.questions()` / `AssistantRun.questions()`: the clarifying
+  questions the agent is asking, if any.
+- `AsyncCominty(user_id=...)` and `client.user_id`. The end-user id can also be
+  set with `COMINTY_USER_ID`.
+- `RateLimitError.scope` (`"organization"`, `"user"` or `"concurrency"`) and
+  `RateLimitError.retry_after`, with a clearer error message saying which limit
+  was hit.
+- Runnable scripts in `examples/` (streaming, follow-ups, threads, custom agent,
+  MCP).
+
+### Changed
+- **Breaking:** `user_id` is now required on the client (argument or
+  `COMINTY_USER_ID`) and is no longer a parameter of `chat.start()`.
+- Fixed `RateLimitError` handling of 429 responses and adjusted response models
+  to the shapes the API actually returns.
+
+## [0.3.0] - 2026-06-29
+
+### Changed
+- **Breaking:** v1 redesign with a new module layout. `client.chat.start()`
+  returns a `StartedChat` handle and `client.chat.stream()` an `AssistantRun`,
+  both streamable. Added the `events` module and the typed exception hierarchy
+  (`InvalidParams`, `StreamInterrupted`, and so on).
+- **Breaking:** the minimum Python version is lowered from 3.11 to 3.9.
+- Toolchain moved to pyright (instead of mypy), `invoke` tasks, and the
+  `AGENTS.md` coding guide.
+
+### Removed
+- The `agents`, `files`, `messages`, `usage` and `api_tokens` resources of the
+  0.1/0.2 client, as well as the retry helper.
+
+### CI
+- PyPI release workflow (Trusted Publishing) and `invoke` build/publish tasks.
+
+## [0.2.0] - 2026-06-19
+
+### Added
+- `agents.create()` (`POST /agents`) and `agents.update()` (`PUT /agents/{id}`)
+  to manage org agents with an API key, no Clerk session required.
 
 ## [0.1.1] - 2026-06-18
 
@@ -92,7 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > `__version__` was already sourced from package metadata as of 0.1.1. That
 > was inaccurate: the SDK still hard-coded the version via
 > `src/cominty_sdk/_version.py` at the time. The actual switch to
-> `importlib.metadata` ships under [Unreleased] above.
+> `importlib.metadata` ships in 0.5.0 above.
 
 ### Docs
 - Setup now points to [platform.cominty.ai](https://platform.cominty.ai) for
@@ -104,6 +151,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial async client `AsyncCominty` covering threads, chat, messages
   (send/stream/export/cancel), files (upload/download), usage, and API tokens.
 
-[Unreleased]: https://github.com/cominty/python-sdk/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/cominty/python-sdk/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/cominty/python-sdk/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/cominty/python-sdk/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/cominty/python-sdk/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/cominty/python-sdk/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/cominty/python-sdk/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/cominty/python-sdk/releases/tag/v0.1.0
