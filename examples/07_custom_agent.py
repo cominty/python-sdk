@@ -5,7 +5,7 @@
 
 A custom agent is one you configure at platform.cominty.ai -> Agents: its own
 model + failover order + custom instructions. From the SDK it's just another
-``agent_id`` — nothing special to call.
+``agent_id``: nothing special to call.
 
 This showcases an agent instructed to turn dense engineering input into a clean,
 non-technical **French** briefing for a C-level decision-maker. We feed it a
@@ -19,7 +19,9 @@ import asyncio
 import _pretty as pretty
 from _shared import CUSTOM_AGENT_ID, make_client
 
-# Deliberately dense and technical — the agent's job is to make this legible to
+from cominty_sdk import MessageScope
+
+# Deliberately dense and technical: the agent's job is to make this legible to
 # a non-technical executive, in French.
 TECHNICAL_INPUT = """\
 Incident RCA (recommendations service): p99 inference latency spiked from ~80ms
@@ -43,15 +45,14 @@ async def main() -> None:
         return
 
     async with make_client() as client:
-        pretty.panel(TECHNICAL_INPUT, title="Technical input (engineering, EN)",
-                     style="yellow")
+        pretty.panel(TECHNICAL_INPUT, title="Technical input (engineering, EN)", style="yellow")
 
         run = await client.chat.start(
             agent_id=CUSTOM_AGENT_ID,
             message=TECHNICAL_INPUT,
-            # Pure transformation — no tools needed, so turn them off for speed
+            # Pure transformation: no tools needed, so turn them off for speed
             # and determinism.
-            disabled_tools=["web", "company_documents", "mcp:*"],
+            message_scope=MessageScope(web=False, indexed_documents=False, mcp=False),
         )
 
         async for event in run:

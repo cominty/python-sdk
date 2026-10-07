@@ -5,7 +5,7 @@
 When an agent needs more input, it ends its turn with one or more questions
 (``prompt`` + suggested ``options``) instead of a final answer. Read them with
 ``run.questions()``, then answer by sending the chosen option (or free text) as
-the next message in the thread — exactly like any other follow-up.
+the next message in the thread: exactly like any other follow-up.
 """
 
 from __future__ import annotations
@@ -36,9 +36,7 @@ async def main() -> None:
         chosen = q.options[0] if q.options else "Tomorrow at 10am"
         pretty.console.print(f"  [green]→ answering:[/] {chosen!r}")
 
-        followup = await client.chat.send(
-            run.thread.id, agent_id=AGENT_ID, message=chosen
-        )
+        followup = await client.chat.send(run.thread.id, agent_id=AGENT_ID, message=chosen)
         pretty.answer(await followup.text())
 
 

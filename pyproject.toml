@@ -41,13 +41,15 @@ dev = [
     "pyright>=1.1",
     "pytest>=8",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=5",
     "respx>=0.21",
     "ruff>=0.6",
     "jupyter>=1.0",
     "nbformat>=5",
     "invoke>=2.2",
     "twine>=5",
-    "rich>=13",  # examples/ pretty terminal output (not a runtime dependency)
+    "rich>=13",  # examples/ pretty output, tasks.py release confirmation prompts
+    "packaging>=23",  # tasks.py release: PEP 440 / SemVer version parsing
 ]
 
 [build-system]
@@ -64,6 +66,7 @@ only-include = ["src/cominty_sdk", "README.md", "pyproject.toml"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+pythonpath = ["."]  # so tests/test_release.py can `import tasks` (repo-root script)
 markers = [
     "integration: opt-in tests requiring COMINTY_API_KEY",
 ]
@@ -74,12 +77,18 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "TID252"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Only single-dot, same-package relative imports (`from .foo import Bar`) are
+# allowed. Anything reaching into a parent package (`from ..foo import Bar`)
+# must be an absolute import instead.
+ban-relative-imports = "parents"
 
 [tool.ruff.lint.per-file-ignores]
 # Unshipped dev entrypoints (excluded from the sdist): manual endpoint-poking
 # scripts and the invoke task runner. Real lint (unused imports, bugs) still
-# applies, but full type annotations are needless ceremony here — invoke tasks
+# applies, but full type annotations are needless ceremony here: invoke tasks
 # idiomatically take an unannotated Context.
 "tasks.py" = ["ANN"]
 
@@ -87,3 +96,14 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 pythonVersion = "3.9"
 typeCheckingMode = "strict"
 include = ["src/cominty_sdk"]
+
+[tool.coverage.run]
+source = ["src/cominty_sdk"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_also = [
+    # Type-only imports; never executed at runtime.
+    "if TYPE_CHECKING:",
+]

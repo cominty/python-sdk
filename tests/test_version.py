@@ -7,7 +7,7 @@ import cominty_sdk
 
 
 def test_version_matches_installed_metadata() -> None:
-    assert cominty_sdk.__version__  == importlib.metadata.version("cominty-sdk")
+    assert cominty_sdk.__version__ == importlib.metadata.version("cominty-sdk")
 
 
 def test_version_falls_back_when_metadata_missing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -21,4 +21,3 @@ def test_version_falls_back_when_metadata_missing(monkeypatch: pytest.MonkeyPatc
         assert cominty_sdk.__version__ == "unknown"
     finally:
         importlib.reload(cominty_sdk)
-

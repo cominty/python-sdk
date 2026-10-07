@@ -23,8 +23,7 @@ try:
     from rich.text import Text
 except ModuleNotFoundError as exc:  # pragma: no cover - example-only guard
     raise SystemExit(
-        "examples need 'rich' — run `uv sync --all-extras --dev` "
-        "(or `pip install rich`)."
+        "examples need 'rich': run `uv sync --all-extras --dev` (or `pip install rich`)."
     ) from exc
 
 from cominty_sdk import ThreadSummary, events
@@ -74,21 +73,18 @@ def render(event: events.AnyEvent) -> None:
     # One row per event: never wrap; crop with … on a too-narrow terminal.
     console.print(line, no_wrap=True, crop=True)
 
-    # LLM reasoning can be a long dump; we showed one truncated line above — flag
+    # LLM reasoning can be a long dump; we showed one truncated line above: flag
     # that the rest is hidden so the stream stays scannable.
     if isinstance(event, events.LlmStep):
         full = " ".join(event.data.description.split())
         if len(full) > _DETAIL_W:
-            console.print(
-                Text(f"       ↳ reasoning hidden ({len(full)} chars)", style="dim")
-            )
+            console.print(Text(f"       ↳ reasoning hidden ({len(full)} chars)", style="dim"))
 
 
 def panel(text: str, *, title: str, style: str = "cyan") -> None:
     """Print arbitrary text in a bordered, titled panel."""
     console.print()
-    console.print(Panel(text.strip(), title=title, border_style=style,
-                        padding=(1, 2)))
+    console.print(Panel(text.strip(), title=title, border_style=style, padding=(1, 2)))
 
 
 def answer(text: str, *, title: str = "Answer") -> None:
@@ -102,8 +98,7 @@ def rule(title: str = "") -> None:
 
 def thread_table(threads: list[ThreadSummary], *, title: str) -> None:
     """Render a list of thread summaries as a table."""
-    table = Table(title=title, title_justify="left", header_style="bold",
-                  expand=False)
+    table = Table(title=title, title_justify="left", header_style="bold", expand=False)
     table.add_column("created", style="dim", no_wrap=True)
     table.add_column("★", justify="center", no_wrap=True)
     table.add_column("name")

@@ -1,5 +1,3 @@
-"""Resolved client configuration."""
-
 from __future__ import annotations
 
 import os
@@ -16,12 +14,7 @@ _USER_ID_ENV = "COMINTY_USER_ID"
 
 @dataclass(frozen=True)
 class Config:
-    """Immutable, fully-resolved client configuration. Built once at construction.
-
-    Internal plumbing, not an I/O boundary — a frozen dataclass, not a pydantic
-    model. This layer only resolves values and checks the required ones are
-    present; format validation belongs on the request/response models.
-    """
+    # Frozen dataclass, not a pydantic model: this layer only resolves values.
 
     api_token: str
     user_id: str
@@ -41,8 +34,7 @@ class Config:
         token = api_token or os.getenv(_TOKEN_ENV)
         if not token:
             raise ValueError(
-                f"api_token is required: pass api_token=... or set {_TOKEN_ENV} "
-                "in the environment."
+                f"api_token is required: pass api_token=... or set {_TOKEN_ENV} in the environment."
             )
         resolved_user_id = user_id or os.getenv(_USER_ID_ENV)
         if not resolved_user_id:
@@ -54,8 +46,6 @@ class Config:
         return cls(
             api_token=token,
             user_id=resolved_user_id,
-            base_url=(base_url or os.getenv(_BASE_URL_ENV) or _DEFAULT_BASE_URL).rstrip(
-                "/"
-            ),
+            base_url=(base_url or os.getenv(_BASE_URL_ENV) or _DEFAULT_BASE_URL).rstrip("/"),
             timeout=timeout if timeout is not None else _DEFAULT_TIMEOUT,
         )

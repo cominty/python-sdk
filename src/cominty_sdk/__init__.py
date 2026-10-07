@@ -1,5 +1,3 @@
-"""Official async Python client for the Cominty managed agent chat API."""
-
 from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
@@ -21,11 +19,20 @@ from .exceptions import (
     ServerError,
     StreamInterrupted,
 )
+from .models.capabilities import (
+    ALL,
+    Activation,
+    AgentCapabilities,
+    IndexedDocumentsFilter,
+    IndexedDocumentsPolicy,
+    McpPolicy,
+    MessageScope,
+    SkillsPolicy,
+)
 from .models.chat import (
     Agent,
     ContentOrigin,
     ConversationFile,
-    DisablableTool,
     HumanMessage,
     Message,
     MessageRole,
@@ -35,8 +42,15 @@ from .models.chat import (
     StartChatOptions,
     StartChatParams,
     Thread,
+    ThreadInception,
     ThreadSummary,
     UpdateThreadParams,
+)
+from .models.memory import (
+    MemoryFileCreate,
+    MemoryFileOut,
+    MemoryFileSummaryOut,
+    MemoryFileUpdate,
 )
 from .streaming import AssistantRun, StartedChat
 
@@ -69,7 +83,14 @@ __all__ = [
     "Agent",
     "ContentOrigin",
     "ConversationFile",
-    "DisablableTool",
+    "ALL",
+    "Activation",
+    "AgentCapabilities",
+    "IndexedDocumentsFilter",
+    "IndexedDocumentsPolicy",
+    "McpPolicy",
+    "MessageScope",
+    "SkillsPolicy",
     "HumanMessage",
     "Message",
     "MessageRole",
@@ -79,6 +100,11 @@ __all__ = [
     "StartChatOptions",
     "StartChatParams",
     "Thread",
+    "ThreadInception",
     "ThreadSummary",
     "UpdateThreadParams",
+    "MemoryFileCreate",
+    "MemoryFileOut",
+    "MemoryFileSummaryOut",
+    "MemoryFileUpdate",
 ]

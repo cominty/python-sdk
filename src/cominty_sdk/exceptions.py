@@ -1,23 +1,3 @@
-"""Exception hierarchy for the Cominty SDK.
-
-::
-
-    ComintyError
-    ├── APIError              # HTTP 4xx/5xx
-    │   ├── AuthError         # 401
-    │   ├── PermissionError   # 403
-    │   ├── NotFoundError     # 404
-    │   ├── ConflictError     # 409
-    │   ├── RateLimitError    # 429
-    │   └── ServerError       # 5xx
-    ├── APIConnectionError    # network / timeout
-    ├── StreamInterrupted     # server shut down mid-stream
-    └── SDKError              # bug in the SDK itself
-
-The wire error body is FastAPI's ``{"detail": str | dict | list}`` — parsed onto
-``APIError.detail``, with the full body kept on ``.body``.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -73,30 +53,30 @@ class APIError(ComintyError):
 
 
 class AuthError(APIError):
-    """401 — missing or invalid ``x-cominty-token``."""
+    """401: missing or invalid ``x-cominty-token``."""
 
 
 class PermissionError(APIError):  # noqa: A001 - intentional, namespaced under the SDK
-    """403 — authenticated but not allowed."""
+    """403: authenticated but not allowed."""
 
 
 class NotFoundError(APIError):
-    """404 — the resource does not exist."""
+    """404: the resource does not exist."""
 
 
 class ConflictError(APIError):
-    """409 — the request conflicts with the current state."""
+    """409: the request conflicts with the current state."""
 
 
 class RateLimitError(APIError):
-    """429 — a rate limit was hit.
+    """429: a rate limit was hit.
 
     The API hits this in one of three ways, surfaced via :attr:`scope`:
 
-    - ``"concurrency"`` — too many chat sessions running at once (your plan's
+    - ``"concurrency"``: too many chat sessions running at once (your plan's
       concurrent-session cap). Transient: retry once an in-flight request finishes.
-    - ``"organization"`` — your organization's request quota is exhausted.
-    - ``"user"`` — your user's request quota is exhausted.
+    - ``"organization"``: your organization's request quota is exhausted.
+    - ``"user"``: your user's request quota is exhausted.
 
     For the quota cases an organization admin must raise the limit; the error
     message says so. :attr:`retry_after` exposes the ``Retry-After`` header if sent.
@@ -104,11 +84,15 @@ class RateLimitError(APIError):
 
     @property
     def scope(self) -> str | None:
-        """Which limit was hit — ``"organization"``, ``"user"``, or
-        ``"concurrency"`` (``None`` if undeterminable).
+        """
+        Which limit was hit.
 
-        Quota 429s carry ``{"quota_reached": "organization" | "user", ...}``;
-        the concurrency cap is a plain ``"Too many concurrent requests"`` string.
+        Quota responses carry ``{"quota_reached": "organization" | "user"}``.
+        The concurrency cap is the string ``"Too many concurrent requests"``.
+
+        Returns:
+            str | None: ``"organization"``, ``"user"``, ``"concurrency"``, or
+                ``None`` when the body does not say.
         """
         if isinstance(self.detail, dict):
             quota = self.detail.get("quota_reached")
@@ -120,7 +104,13 @@ class RateLimitError(APIError):
 
     @property
     def retry_after(self) -> float | None:
-        """Seconds to wait before retrying, from the ``Retry-After`` header if set."""
+        """
+        Seconds to wait before retrying.
+
+        Returns:
+            float | None: The ``Retry-After`` header, or ``None`` when it is absent
+                or not a number.
+        """
         if self.headers:
             raw = self.headers.get("Retry-After") or self.headers.get("retry-after")
             if raw is not None:
@@ -132,12 +122,15 @@ class RateLimitError(APIError):
 
     @property
     def reset_at(self) -> datetime | None:
-        """When the quota clears, from the ``reset_at`` detail field (or the
-        ``X-RateLimit-Reset`` header)."""
+        """
+        When the quota clears.
+
+        Returns:
+            datetime | None: ``reset_at`` or ``locked_until`` from the body, else
+                the ``X-RateLimit-Reset`` header, else ``None``.
+        """
         if isinstance(self.detail, dict):
-            parsed = _parse_dt(
-                self.detail.get("reset_at") or self.detail.get("locked_until")
-            )
+            parsed = _parse_dt(self.detail.get("reset_at") or self.detail.get("locked_until"))
             if parsed is not None:
                 return parsed
         if self.headers:
@@ -146,7 +139,7 @@ class RateLimitError(APIError):
 
 
 class ServerError(APIError):
-    """5xx — the server failed to handle the request."""
+    """5xx: the server failed to handle the request."""
 
 
 class APIConnectionError(ComintyError):
@@ -156,7 +149,7 @@ class APIConnectionError(ComintyError):
 class StreamInterrupted(ComintyError):
     """The server shut down mid-stream before the message completed.
 
-    ``partial`` is the message as far as it got — its ``status`` reflects how
+    ``partial`` is the message as far as it got: its ``status`` reflects how
     much was persisted.
     """
 
@@ -184,7 +177,7 @@ class InvalidParams(ComintyError):
     """Arguments failed validation before any request was sent.
 
     Raised by the SDK at the call boundary so callers never see a raw pydantic
-    ``ValidationError``. ``errors`` is the structured, typed breakdown — one entry
+    ``ValidationError``. ``errors`` is the structured, typed breakdown: one entry
     per offending parameter.
     """
 
@@ -193,23 +186,15 @@ class InvalidParams(ComintyError):
         self.errors = errors
 
     @classmethod
-    def from_validation_error(
-        cls, exc: ValidationError, *, context: str
-    ) -> InvalidParams:
-        """Translate a pydantic ``ValidationError`` into a clean SDK error.
-
-        ``context`` names the operation for the message header, e.g. ``"chat.start"``.
-        """
+    def from_validation_error(cls, exc: ValidationError, *, context: str) -> InvalidParams:
         grouped: dict[str, dict[str, Any]] = {}
         for err in exc.errors(include_url=False):
             path = _clean_param_path(err["loc"])
-            group = grouped.setdefault(
-                path, {"msgs": [], "input": None, "show_input": False}
-            )
+            group = grouped.setdefault(path, {"msgs": [], "input": None, "show_input": False})
             if err["msg"] not in group["msgs"]:
                 group["msgs"].append(err["msg"])
-            # "missing"/"extra_forbidden" carry the parent container as input —
-            # noise, so don't surface a value for those.
+            # "missing"/"extra_forbidden" carry the parent container as input.
+            # That value is noise, so don't surface it.
             if err["type"] not in _NO_INPUT_TYPES:
                 group["show_input"] = True
                 group["input"] = err.get("input")
@@ -230,16 +215,10 @@ _NO_INPUT_TYPES = frozenset({"missing", "extra_forbidden"})
 
 
 def _clean_param_path(loc: tuple[str | int, ...]) -> str:
-    """Turn a pydantic ``loc`` into the public argument name.
-
-    Drops the internal ``message``/``options`` request wrappers and pydantic's
-    synthetic union/type tags (``"literal[...]"``, ``"constrained-str"``) — those
-    always contain ``[`` or ``-``, which a Python identifier never can.
-    """
+    # Drop message/options wrappers and pydantic tags such as "literal[...]"
+    # or "constrained-str". Those segments contain "[" or "-".
     parts: list[str | int] = [
-        seg
-        for seg in loc
-        if isinstance(seg, int) or ("[" not in seg and "-" not in seg)
+        seg for seg in loc if isinstance(seg, int) or ("[" not in seg and "-" not in seg)
     ]
     if parts and parts[0] in ("message", "options"):
         parts = parts[1:]
@@ -264,14 +243,11 @@ def error_from_response(
     body: Any,  # noqa: ANN401 - raw decoded error body
     headers: Mapping[str, str] | None = None,
 ) -> APIError:
-    """Build the right :class:`APIError` subclass from a failed HTTP response."""
     detail: str | dict[str, Any] | list[Any] | None = None
     if isinstance(body, dict):
         detail = cast("dict[str, Any]", body).get("detail")
     message = detail if isinstance(detail, str) else f"HTTP {status_code}"
-    cls = _STATUS_MAP.get(status_code) or (
-        ServerError if status_code >= 500 else APIError
-    )
+    cls = _STATUS_MAP.get(status_code) or (ServerError if status_code >= 500 else APIError)
     # A bare "HTTP 429" is useless. Turn the server's terse detail into a clear,
     # actionable message (which limit was hit + what the caller can do).
     if cls is RateLimitError:
@@ -299,8 +275,7 @@ _ADMIN_HINT = "Ask an organization admin to raise your plan's limit."
 # Per-scope opener, made explicit so the caller knows *which* limit was hit.
 _QUOTA_HEAD = {
     "organization": (
-        "Organization rate limit reached: your organization's total request "
-        "quota is exhausted"
+        "Organization rate limit reached: your organization's total request quota is exhausted"
     ),
     "user": "User rate limit reached: your user request quota is exhausted",
 }
@@ -310,12 +285,6 @@ def _rate_limit_message(
     detail: str | dict[str, Any] | list[Any] | None,
     headers: Mapping[str, str] | None,
 ) -> str:
-    """Compose a clear, actionable 429 message from the server's detail.
-
-    Two shapes from the API:
-    - quota:       ``{"quota_reached": "organization" | "user", "reset_at": ...}``
-    - concurrency: the string ``"Too many concurrent requests"``
-    """
     info = detail if isinstance(detail, dict) else {}
     text = detail.strip() if isinstance(detail, str) else ""
     quota = info.get("quota_reached")
@@ -325,8 +294,8 @@ def _rate_limit_message(
     elif isinstance(quota, str) and quota:  # forward-compat for a new scope name
         head = f"{quota.capitalize()} rate limit reached: request quota exhausted"
     elif "concurrent" in text.lower():
-        # Concurrency cap (CHAT_MAX_CONCURRENT_SESSIONS_*): transient — the count
-        # frees as in-flight requests finish — but raising it needs an admin.
+        # Concurrency cap (CHAT_MAX_CONCURRENT_SESSIONS_*): transient, the count
+        # frees as in-flight requests finish, but raising it needs an admin.
         return (
             "Too many concurrent requests: your plan's limit on simultaneous chat "
             "sessions is reached. Wait for an in-flight request to finish and "
@@ -335,14 +304,12 @@ def _rate_limit_message(
     else:
         head = text or "Rate limit reached"
 
-    when = _when_phrase(_parse_dt(info.get("reset_at") or info.get("locked_until")),
-                        headers)
+    when = _when_phrase(_parse_dt(info.get("reset_at") or info.get("locked_until")), headers)
     tail = f" {when}" if when else ""
     return f"{head}. {_ADMIN_HINT}{tail}"
 
 
 def _when_phrase(reset_at: datetime | None, headers: Mapping[str, str] | None) -> str:
-    """When the caller can retry: a ``Retry-After`` delay, else a reset time."""
     if headers:
         raw = headers.get("Retry-After") or headers.get("retry-after")
         if raw is not None:

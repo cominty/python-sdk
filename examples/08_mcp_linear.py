@@ -6,15 +6,16 @@
 Builds on 07: the same custom French executive-briefing agent, but here it pulls
 live context from the **Linear MCP server** instead of being handed the data.
 The agent looks up Hiroshi's tasks in the current sprint, then reports them in
-its own tone — a clean, non-technical French summary for leadership.
+its own tone: a clean, non-technical French summary for leadership.
 
 Prerequisites (configured on the platform, not in code):
 - The Linear MCP server is connected to your org / available to the agent.
 - The custom agent has tools (MCP) enabled.
 
-Tool control is by *exclusion*: tools are on by default and you disable what you
-don't want. Here we disable web search and company documents so the agent draws
-context only from MCP (Linear). Watch the stream for the Linear tool calls.
+Capability control is per message: capabilities are on by default and you turn off
+what you don't want with ``MessageScope``. Here we turn off web search and
+indexed documents so the agent draws context only from MCP (Linear). Watch the
+stream for the Linear tool calls.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ import asyncio
 import _pretty as pretty
 from _shared import CUSTOM_AGENT_ID, make_client
 
-from cominty_sdk import events
+from cominty_sdk import MessageScope, events
 
 REQUEST = (
     "Using Linear, list the tasks assigned to Hiroshi in the current sprint. "
@@ -48,7 +49,7 @@ async def main() -> None:
             agent_id=CUSTOM_AGENT_ID,
             message=REQUEST,
             # Keep MCP (Linear) ON; cut the rest so context comes only from Linear.
-            disabled_tools=["web", "company_documents"],
+            message_scope=MessageScope(web=False, indexed_documents=False),
         )
 
         # The stream surfaces the Linear MCP calls as ToolCall events.
@@ -60,7 +61,7 @@ async def main() -> None:
                 )
 
         # Reported in the agent's voice: French, C-level, bullet points.
-        pretty.answer(await run.text(), title="Synthèse sprint — Hiroshi (FR)")
+        pretty.answer(await run.text(), title="Synthèse sprint: Hiroshi (FR)")
 
 
 if __name__ == "__main__":

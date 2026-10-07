@@ -1,10 +1,3 @@
-"""Shared fixtures for the v1 test suite.
-
-Minimalist on purpose — a base URL, a live ``AsyncCominty`` bound to a respx
-mock, and small factories for the ``ThreadOut`` / ``MessageOut`` payloads the
-chat endpoints return.
-"""
-
 from __future__ import annotations
 
 import json
@@ -22,7 +15,7 @@ BASE_URL = "https://api.test"
 THREAD_ID = "11111111-1111-1111-1111-111111111111"
 USER_MSG_ID = "22222222-2222-2222-2222-222222222222"
 ASSISTANT_MSG_ID = "33333333-3333-3333-3333-333333333333"
-# A well-formed Cominty (Clerk) user id — matches ^user_[A-Za-z0-9]{20,}$, which
+# A well-formed Cominty (Clerk) user id: matches ^user_[A-Za-z0-9]{20,}$, which
 # the client validates at construction. Set once, applied to every call.
 USER_ID = "user_31HPTBuBvX20xlQNAbvxjOxPbKB"
 
@@ -40,16 +33,12 @@ def user_id() -> str:
 @pytest.fixture
 def ids() -> SimpleNamespace:
     """Canonical UUIDs used across the default thread payload."""
-    return SimpleNamespace(
-        thread=THREAD_ID, user_msg=USER_MSG_ID, assistant_msg=ASSISTANT_MSG_ID
-    )
+    return SimpleNamespace(thread=THREAD_ID, user_msg=USER_MSG_ID, assistant_msg=ASSISTANT_MSG_ID)
 
 
 @pytest_asyncio.fixture
 async def client(base_url: str) -> AsyncIterator[AsyncCominty]:
-    async with AsyncCominty(
-        api_token="test-token", user_id=USER_ID, base_url=base_url
-    ) as instance:
+    async with AsyncCominty(api_token="test-token", user_id=USER_ID, base_url=base_url) as instance:
         yield instance
 
 
@@ -68,18 +57,23 @@ def make_message() -> Callable[..., dict[str, Any]]:
         content: str = "",
         status: str = "success",
         live: bool = False,
+        agent: dict[str, Any] | str | None = None,
     ) -> dict[str, Any]:
+        if agent is None and role == "assistant":
+            agent = {"id": "agt_1", "name": "Support"}
         return {
             "id": id,
             "thread_id": THREAD_ID,
             "role": role,
             "content": content,
+            "error_code": None,
             "questions": None,
             "live": live,
             "status": status,
             "events": None,
             "structured_output": None,
             "files": [],
+            "agent": agent,
         }
 
     return _make
@@ -110,8 +104,8 @@ def make_thread(
             "name": name,
             "created_at": "2026-06-28T10:00:00Z",
             "live": True,
-            "agent": {"id": "agt_1", "name": "Support"},
             "starred": False,
+            "inception": "conversational",
             "project_id": None,
             "messages": messages,
         }

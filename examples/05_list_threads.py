@@ -21,7 +21,7 @@ async def main() -> None:
         threads = await client.threads.list(limit=20)
 
         if not threads:
-            pretty.console.print("No threads yet — run a chat example first.")
+            pretty.console.print("No threads yet: run a chat example first.")
             return
 
         pretty.thread_table(threads, title=f"Threads for {client.user_id}")

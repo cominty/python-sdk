@@ -3,7 +3,7 @@
     python examples/06_manage_thread.py
 
 Demonstrates the rest of the threads resource: ``get`` (full history),
-``update`` (partial — only the fields you pass are changed), and ``archive``.
+``update`` (partial: only the fields you pass are changed), and ``archive``.
 """
 
 from __future__ import annotations
@@ -24,17 +24,13 @@ async def main() -> None:
         # get() -> full thread with message history.
         thread = await client.threads.get(thread_id)
         pretty.console.print(
-            f"  [bold]get[/]      {len(thread.messages)} messages, "
-            f"name={thread.name!r}"
+            f"  [bold]get[/]      {len(thread.messages)} messages, name={thread.name!r}"
         )
 
         # update() is partial: rename and star in one call, or either alone.
-        updated = await client.threads.update(
-            thread_id, name="Renamed via SDK", starred=True
-        )
+        updated = await client.threads.update(thread_id, name="Renamed via SDK", starred=True)
         pretty.console.print(
-            f"  [bold]update[/]   name={updated.name!r}  "
-            f"starred=[yellow]{updated.starred}[/]"
+            f"  [bold]update[/]   name={updated.name!r}  starred=[yellow]{updated.starred}[/]"
         )
 
         # archive() soft-deletes the thread.

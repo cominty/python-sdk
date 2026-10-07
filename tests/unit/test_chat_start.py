@@ -1,10 +1,3 @@
-"""Exhaustive unit tests for ``client.chat.start``.
-
-Covers: the request it sends, the handle it returns, client-side validation
-(which must never hit the network), HTTP error mapping, and edge cases in
-locating the assistant reply.
-"""
-
 from __future__ import annotations
 
 import json
@@ -17,10 +10,15 @@ import pytest
 import respx
 
 from cominty_sdk import (
+    ALL,
+    Agent,
+    AgentCapabilities,
     AsyncCominty,
     AuthError,
     ConflictError,
     InvalidParams,
+    McpPolicy,
+    MessageScope,
     NotFoundError,
     PermissionError,
     RateLimitError,
@@ -32,7 +30,7 @@ from cominty_sdk import (
 MakeThread = Callable[..., dict[str, Any]]
 MakeMessage = Callable[..., dict[str, Any]]
 
-# A well-formed Cominty (Clerk) user id — must match ^user_[A-Za-z0-9]{20,}$,
+# A well-formed Cominty (Clerk) user id: must match ^user_[A-Za-z0-9]{20,}$,
 # which client-side validation enforces before any request goes out.
 USER_ID = "user_31HPTBuBvX20xlQNAbvxjOxPbKB"
 
@@ -43,7 +41,7 @@ _ASSISTANT_2 = "66666666-6666-6666-6666-666666666666"
 
 
 # --------------------------------------------------------------------------- #
-# Happy path — the returned handle
+# Happy path: the returned handle
 # --------------------------------------------------------------------------- #
 async def test_returns_started_chat_with_thread_and_reply(
     client: AsyncCominty,
@@ -58,7 +56,9 @@ async def test_returns_started_chat_with_thread_and_reply(
     assert isinstance(run, StartedChat)
     assert str(run.thread.id) == ids.thread
     assert str(run.message_id) == ids.assistant_msg  # the live assistant reply
-    assert run.thread.agent.name == "Support"
+    agent = run.thread.messages[-1].agent
+    assert isinstance(agent, Agent)
+    assert agent.name == "Support"
 
 
 async def test_thread_is_non_optional_on_started_chat(
@@ -66,19 +66,17 @@ async def test_thread_is_non_optional_on_started_chat(
 ) -> None:
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
     run = await client.chat.start(agent_id="agt_1", message="hi")
-    # StartedChat narrows thread to Thread (never None) — accessible without a guard.
+    # StartedChat narrows thread to Thread (never None): accessible without a guard.
     assert run.thread.messages[0].role.value == "user"
 
 
 # --------------------------------------------------------------------------- #
-# Happy path — the request that goes out
+# Happy path: the request that goes out
 # --------------------------------------------------------------------------- #
 async def test_sends_post_with_token_and_minimal_body(
     client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
 ) -> None:
-    route = mock_api.post("/chat").mock(
-        return_value=httpx.Response(200, json=make_thread())
-    )
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
 
     await client.chat.start(agent_id="agt_1", message="hi")
 
@@ -96,26 +94,18 @@ async def test_sends_post_with_token_and_minimal_body(
 async def test_includes_optional_fields_when_provided(
     client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
 ) -> None:
-    route = mock_api.post("/chat").mock(
-        return_value=httpx.Response(200, json=make_thread())
-    )
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
 
     await client.chat.start(
         agent_id="agt_1",
         message="hi",
         name="My chat",
         file_ids=["f1", "f2"],
-        source_ids=[1, 2],
-        document_ids=["d1"],
-        disabled_tools=["web", "mcp:slack"],
     )
 
     body = json.loads(route.calls.last.request.content)
     assert body["name"] == "My chat"
     assert body["message"]["file_ids"] == ["f1", "f2"]
-    assert body["message"]["source_ids"] == [1, 2]
-    assert body["message"]["document_ids"] == ["d1"]
-    assert body["message"]["disabled_tools"] == ["web", "mcp:slack"]
 
 
 async def test_start_does_not_open_the_stream(
@@ -130,29 +120,41 @@ async def test_start_does_not_open_the_stream(
     assert mock_api.calls.last.request.method == "POST"
 
 
-@pytest.mark.parametrize("tool", ["web", "company_documents", "mcp:slack", "mcp:*"])
-async def test_valid_disabled_tools_accepted(
-    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread, tool: str
+async def test_includes_memory_namespace_when_provided(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
 ) -> None:
-    route = mock_api.post("/chat").mock(
-        return_value=httpx.Response(200, json=make_thread())
-    )
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
 
-    await client.chat.start(
-        agent_id="a", message="hi", disabled_tools=[tool]
-    )
+    await client.chat.start(agent_id="agt_1", message="hi", memory_namespace="support-bot")
 
-    assert route.called
-    assert json.loads(route.calls.last.request.content)["message"]["disabled_tools"] == [
-        tool
-    ]
+    body = json.loads(route.calls.last.request.content)
+    assert body["options"]["memory_namespace"] == "support-bot"
+
+
+async def test_omits_memory_namespace_when_not_provided(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
+) -> None:
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
+
+    await client.chat.start(agent_id="agt_1", message="hi")
+
+    assert "memory_namespace" not in json.loads(route.calls.last.request.content)["options"]
+
+
+async def test_memory_namespace_too_long_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter
+) -> None:
+    route = mock_api.post("/chat")
+
+    with pytest.raises(InvalidParams):
+        await client.chat.start(agent_id="agt_1", message="hi", memory_namespace="x" * 129)
+
+    assert not route.called
 
 
 async def test_uses_configured_base_url(make_thread: MakeThread) -> None:
     with respx.mock(base_url="https://sandbox.test", assert_all_called=False) as router:
-        route = router.post("/chat").mock(
-            return_value=httpx.Response(200, json=make_thread())
-        )
+        route = router.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
         async with AsyncCominty(
             api_token="t", user_id=USER_ID, base_url="https://sandbox.test"
         ) as c:
@@ -161,41 +163,9 @@ async def test_uses_configured_base_url(make_thread: MakeThread) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Client-side validation — must fail BEFORE any HTTP request
+# Client-side validation: must fail BEFORE any HTTP request
 # --------------------------------------------------------------------------- #
-async def test_invalid_disabled_tool_raises_before_request(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
-    route = mock_api.post("/chat")
-
-    with pytest.raises(InvalidParams) as exc:
-        await client.chat.start(
-            agent_id="a", message="hi", disabled_tools=["bogus"]
-        )
-
-    assert not route.called
-    assert len(mock_api.calls) == 0
-    assert any(e["param"] == "disabled_tools[0]" for e in exc.value.errors)
-    assert exc.value.errors[0]["input"] == "bogus"
-
-
-async def test_invalid_source_id_type_raises(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
-    route = mock_api.post("/chat")
-
-    with pytest.raises(InvalidParams) as exc:
-        await client.chat.start(
-            agent_id="a", message="hi", source_ids=["nope"]  # type: ignore[list-item]
-        )
-
-    assert not route.called
-    assert any(e["param"] == "source_ids[0]" for e in exc.value.errors)
-
-
-async def test_content_too_long_raises(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
+async def test_content_too_long_raises(client: AsyncCominty, mock_api: respx.MockRouter) -> None:
     route = mock_api.post("/chat")
 
     with pytest.raises(InvalidParams) as exc:
@@ -205,16 +175,14 @@ async def test_content_too_long_raises(
     assert any(e["param"] == "content" for e in exc.value.errors)
 
 
-async def test_too_many_file_ids_raises(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
+async def test_too_many_file_ids_raises(client: AsyncCominty, mock_api: respx.MockRouter) -> None:
     route = mock_api.post("/chat")
 
     with pytest.raises(InvalidParams) as exc:
         await client.chat.start(
             agent_id="a",
             message="hi",
-                file_ids=[f"f{i}" for i in range(6)],
+            file_ids=[f"f{i}" for i in range(6)],
         )
 
     assert not route.called
@@ -227,26 +195,23 @@ async def test_multiple_validation_errors_collected(
     with pytest.raises(InvalidParams) as exc:
         await client.chat.start(
             agent_id="a",
-            message="hi",
-                disabled_tools=["bad"],
-            source_ids=["nope"],  # type: ignore[list-item]
+            message="x" * 30_001,
+            file_ids=[1],  # type: ignore[list-item]
         )
 
     params = {e["param"] for e in exc.value.errors}
-    assert {"disabled_tools[0]", "source_ids[0]"} <= params
+    assert {"content", "file_ids[0]"} <= params
     assert len(mock_api.calls) == 0
 
 
 async def test_invalid_params_message_is_clean(client: AsyncCominty) -> None:
     with pytest.raises(InvalidParams) as exc:
-        await client.chat.start(
-            agent_id="a", message="hi", disabled_tools=["bad"]
-        )
+        await client.chat.start(agent_id="a", message="x" * 30_001)
 
     text = str(exc.value)
     assert text.startswith("Invalid parameters for chat.start:")
-    assert "disabled_tools[0]" in text
-    assert "got 'bad'" in text  # the offending value is shown
+    assert "content" in text
+    assert "at most 30000" in text  # the constraint is shown
     assert "pydantic" not in text.lower()  # no leaked library internals
 
 
@@ -270,9 +235,7 @@ async def test_http_errors_map_to_exceptions(
     status: int,
     expected: type[Exception],
 ) -> None:
-    mock_api.post("/chat").mock(
-        return_value=httpx.Response(status, json={"detail": "nope"})
-    )
+    mock_api.post("/chat").mock(return_value=httpx.Response(status, json={"detail": "nope"}))
 
     with pytest.raises(expected):
         await client.chat.start(agent_id="a", message="hi")
@@ -296,7 +259,7 @@ async def test_rate_limit_concurrency_message(
     assert err.scope == "concurrency"
     text = str(err)
     assert "concurrent" in text.lower()
-    assert "Wait for an in-flight request" in text  # transient — retry guidance
+    assert "Wait for an in-flight request" in text  # transient: retry guidance
     assert "admin" in text.lower()
 
 
@@ -329,9 +292,7 @@ async def test_rate_limit_organization_quota(
     assert "Quota resets at 2026-06-30T00:00:00+00:00" in text
 
 
-async def test_rate_limit_user_quota(
-    client: AsyncCominty, mock_api: respx.MockRouter
-) -> None:
+async def test_rate_limit_user_quota(client: AsyncCominty, mock_api: respx.MockRouter) -> None:
     mock_api.post("/chat").mock(
         return_value=httpx.Response(
             429,
@@ -365,9 +326,7 @@ async def test_thread_without_assistant_message_raises_sdk_error(
     make_message: MakeMessage,
     ids: SimpleNamespace,
 ) -> None:
-    payload = make_thread(
-        messages=[make_message(id=ids.user_msg, role="user", content="hi")]
-    )
+    payload = make_thread(messages=[make_message(id=ids.user_msg, role="user", content="hi")])
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=payload))
 
     with pytest.raises(SDKError):
@@ -386,9 +345,7 @@ async def test_picks_last_assistant_message(
             make_message(id=ids.user_msg, role="user", content="hi"),
             make_message(id=_ASSISTANT_1, role="assistant", content="first"),
             make_message(id=_USER_2, role="user", content="again"),
-            make_message(
-                id=_ASSISTANT_2, role="assistant", status="pending", live=True
-            ),
+            make_message(id=_ASSISTANT_2, role="assistant", status="pending", live=True),
         ]
     )
     mock_api.post("/chat").mock(return_value=httpx.Response(200, json=payload))
@@ -396,3 +353,40 @@ async def test_picks_last_assistant_message(
     run = await client.chat.start(agent_id="a", message="hi")
 
     assert str(run.message_id) == _ASSISTANT_2
+
+
+# --------------------------------------------------------------------------- #
+# Capabilities
+# --------------------------------------------------------------------------- #
+async def test_sends_thread_capabilities_and_message_scope(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
+) -> None:
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
+
+    await client.chat.start(
+        agent_id="agt_1",
+        message="hi",
+        thread_capabilities=AgentCapabilities(
+            web="never", mcp=McpPolicy(activation="always", connections=ALL)
+        ),
+        message_scope=MessageScope(image_generation=True),
+    )
+
+    body = json.loads(route.calls.last.request.content)
+    assert body["options"]["capabilities"] == {
+        "web": {"activation": "never"},
+        "mcp": {"activation": "always", "connections": "*"},
+    }
+    assert body["message"]["capabilities"] == {"image_generation": {"enabled": True}}
+
+
+async def test_omits_capabilities_by_default(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
+) -> None:
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
+
+    await client.chat.start(agent_id="agt_1", message="hi")
+
+    body = json.loads(route.calls.last.request.content)
+    assert "capabilities" not in body["options"]
+    assert "capabilities" not in body["message"]

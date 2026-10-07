@@ -1,7 +1,7 @@
 name: Release
 
 # Publishes to PyPI when a GitHub Release is published.
-# Uses PyPI Trusted Publishing (OIDC) — no API token stored anywhere.
+# Uses PyPI Trusted Publishing (OIDC): no API token stored anywhere.
 on:
   release:
     types: [published]
