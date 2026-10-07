@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `chat.start(..., max_steps=...)` and `chat.send(..., max_steps=...)`: cap the
+  agent's tool rounds for that one message (integer `>= 1`). The cap is per
+  message, not per thread: a follow-up that leaves it unset runs with the server
+  default (60 today, subject to change). Leaving it unset, or passing the new
+  `SERVER_DEFAULT` sentinel, omits the field from the request. There is no
+  "unlimited": `None`, integers below 1, floats, bools, and strings raise
+  `InvalidParams` locally. Reaching the cap is not an error: the reply ends with
+  `status="success"` and asks whether to continue, with no flag to detect it.
+  New exports `SERVER_DEFAULT` and the `MaxSteps` alias. See
+  `examples/10_max_steps.py`. Routines (which also accept `max_steps` server-side)
+  are not exposed by this SDK.
 - `Message.agent`: the agent that handled that message (`Agent | Literal["ARCHIVED"] | None`;
   `"ARCHIVED"` if the original agent has since been deleted). `Message.error_code`: set when
   the message failed for a known reason (e.g. `"budget_exhausted"`), typed as a plain `str`

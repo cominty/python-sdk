@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from .chat import (
+    SERVER_DEFAULT,
     Agent,
     ContentOrigin,
     ConversationFile,
     DisablableTool,
     HumanMessage,
+    MaxSteps,
     Message,
     MessageRole,
     MessageStatus,
@@ -25,6 +27,7 @@ __all__ = [
     "ConversationFile",
     "DisablableTool",
     "HumanMessage",
+    "MaxSteps",
     "Message",
     "MessageRole",
     "MessageStatus",
@@ -33,6 +36,7 @@ __all__ = [
     "MemoryFileSummaryOut",
     "MemoryFileUpdate",
     "Question",
+    "SERVER_DEFAULT",
     "ShareLink",
     "StartChatOptions",
     "StartChatParams",

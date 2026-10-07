@@ -6,7 +6,14 @@ from enum import Enum
 from typing import Annotated, Any, Literal, Union
 from uuid import UUID
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+)
 from typing_extensions import TypeAlias
 
 from .memory import MemoryNamespace
@@ -22,6 +29,8 @@ __all__ = [
     "validate_user_id",
     "DISABLE_MCP_PREFIX",
     "DISABLE_ALL_MCP",
+    "SERVER_DEFAULT",
+    "MaxSteps",
     # request models
     "HumanMessage",
     "StartChatOptions",
@@ -95,6 +104,20 @@ DISABLE_MCP_PREFIX = "mcp:"
 DISABLE_ALL_MCP = f"{DISABLE_MCP_PREFIX}*"
 """Wildcard token that disables every connected MCP server at once."""
 
+
+# Single-member enum: the one sentinel idiom pyright narrows with `is`.
+# typing_extensions.sentinel is not understood by pyright's bundled typeshed.
+class _ServerDefaultType(Enum):
+    SERVER_DEFAULT = "SERVER_DEFAULT"
+
+
+SERVER_DEFAULT = _ServerDefaultType.SERVER_DEFAULT
+"""Default of ``max_steps``: the field is left out of the request and the server
+applies its own default (60 today, subject to change)."""
+
+MaxSteps: TypeAlias = Union[int, Literal[_ServerDefaultType.SERVER_DEFAULT]]
+"""A tool-round cap: an integer ``>= 1``, or ``SERVER_DEFAULT`` to omit it."""
+
 # TODO: include the wildcard * for disable all, can it be with the other literals?
 DisablableTool: TypeAlias = Union[
     Literal["web", "company_documents"],
@@ -127,6 +150,18 @@ class StartChatOptions(BaseModel):
     memory_namespace: MemoryNamespace | None = None
     """Memory bag for this thread, frozen once the thread starts. Omit to run
     with no memory tools, unless the agent has its own namespace set."""
+    max_steps: int | None = Field(default=None, ge=1)
+    """Tool-round cap for this message only. Omit to let the server apply its
+    default. ``None`` is the "omitted" state, never a value: an explicit ``None``
+    is rejected, since the API has no "unlimited" and answers ``null`` with a 422."""
+
+    @field_validator("max_steps", mode="before")
+    @classmethod
+    def _reject_explicit_none(cls, value: object) -> object:
+        # Validators skip defaults, so this only fires on an explicit None.
+        if value is None:
+            raise ValueError("expected an integer >= 1, or leave it unset for the server default")
+        return value
 
 
 class StartChatParams(BaseModel):

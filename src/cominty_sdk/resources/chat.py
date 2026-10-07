@@ -7,7 +7,9 @@ from pydantic import ValidationError
 
 from cominty_sdk.exceptions import InvalidParams, SDKError
 from cominty_sdk.models.chat import (
+    SERVER_DEFAULT,
     DisablableTool,
+    MaxSteps,
     Message,
     MessageRole,
     StartChatParams,
@@ -37,6 +39,7 @@ class ChatResource:
         document_ids: list[str] | None = None,
         disabled_tools: list[DisablableTool] | None = None,
         memory_namespace: str | None = None,
+        max_steps: MaxSteps = SERVER_DEFAULT,
     ) -> StartedChat:
         """
         Start a new thread and return a handle on the assistant reply.
@@ -55,6 +58,12 @@ class ChatResource:
             memory_namespace (str | None): Memory bag for this thread, frozen for its
                 lifetime. Omit to run with no memory tools, unless the agent has its
                 own namespace set. A follow-up cannot change it.
+            max_steps (MaxSteps): Cap on the agent's tool rounds for this
+                message, an integer ``>= 1``. Leave it at ``SERVER_DEFAULT`` to let the
+                server apply its own default (60 today, subject to change). Reaching the
+                cap is not an error: the reply ends with ``status="success"`` and asks
+                whether to continue. It is a rough order of magnitude, not an exact
+                count, and does not limit tokens, cost, or duration.
 
         Returns:
             StartedChat: Handle for the in-progress assistant reply. ``thread`` is set.
@@ -71,6 +80,7 @@ class ChatResource:
             document_ids=document_ids,
             disabled_tools=disabled_tools,
             memory_namespace=memory_namespace,
+            max_steps=max_steps,
             context="chat.start",
         )
         raw = await self._transport.request("POST", "/chat", json_body=body)
@@ -88,6 +98,7 @@ class ChatResource:
         source_ids: list[int] | None = None,
         document_ids: list[str] | None = None,
         disabled_tools: list[DisablableTool] | None = None,
+        max_steps: MaxSteps = SERVER_DEFAULT,
     ) -> AssistantRun:
         """
         Send a follow-up in an existing thread.
@@ -106,6 +117,12 @@ class ChatResource:
             source_ids (list[int] | None): Connected source ids attached to the message.
             document_ids (list[str] | None): Document ids attached to the message.
             disabled_tools (list[DisablableTool] | None): Tools the agent must not use.
+            max_steps (MaxSteps): Cap on the agent's tool rounds for this
+                message, an integer ``>= 1``. The cap is per message, not per thread:
+                a follow-up that leaves it at ``SERVER_DEFAULT`` runs with the server
+                default (60 today), whatever earlier messages used. Pass an integer on
+                every call to keep a custom cap. Typically the answer to a "do you want
+                me to continue?" reply.
 
         Returns:
             AssistantRun: Handle for the new assistant reply.
@@ -122,6 +139,7 @@ class ChatResource:
             document_ids=document_ids,
             disabled_tools=disabled_tools,
             memory_namespace=None,
+            max_steps=max_steps,
             context="chat.send",
         )
         raw = await self._transport.request("POST", f"/chat/{thread_id}", json_body=body)
@@ -153,11 +171,21 @@ class ChatResource:
         document_ids: list[str] | None,
         disabled_tools: list[DisablableTool] | None,
         memory_namespace: str | None,
+        max_steps: MaxSteps,
         context: str,
     ) -> dict[str, object]:
         # Validate the whole request in one pass so error locations are rooted
         # consistently, then surface a clean SDK error instead of raw pydantic.
         # user_id is sourced from the client, not the caller.
+        options: dict[str, object] = {
+            "agent_id": agent_id,
+            "user_id": self._user_id,
+            "memory_namespace": memory_namespace,
+        }
+        # The sentinel leaves the key out so the server default applies. An
+        # explicit None is passed through on purpose: the model rejects it.
+        if max_steps is not SERVER_DEFAULT:
+            options["max_steps"] = max_steps
         try:
             params = StartChatParams.model_validate(
                 {
@@ -169,11 +197,7 @@ class ChatResource:
                         "document_ids": document_ids,
                         "disabled_tools": disabled_tools,
                     },
-                    "options": {
-                        "agent_id": agent_id,
-                        "user_id": self._user_id,
-                        "memory_namespace": memory_namespace,
-                    },
+                    "options": options,
                 }
             )
         except ValidationError as exc:

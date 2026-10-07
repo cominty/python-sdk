@@ -10,6 +10,7 @@ import pytest
 import respx
 
 from cominty_sdk import (
+    SERVER_DEFAULT,
     Agent,
     AsyncCominty,
     AuthError,
@@ -163,6 +164,47 @@ async def test_memory_namespace_too_long_raises_invalid_params(
     with pytest.raises(InvalidParams):
         await client.chat.start(agent_id="agt_1", message="hi", memory_namespace="x" * 129)
 
+    assert not route.called
+
+
+async def test_sends_max_steps_in_options_when_provided(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread
+) -> None:
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
+
+    await client.chat.start(agent_id="agt_1", message="hi", max_steps=5)
+
+    assert json.loads(route.calls.last.request.content)["options"]["max_steps"] == 5
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+async def test_omits_max_steps_for_the_server_default(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_thread: MakeThread, explicit: bool
+) -> None:
+    route = mock_api.post("/chat").mock(return_value=httpx.Response(200, json=make_thread()))
+
+    if explicit:
+        await client.chat.start(agent_id="agt_1", message="hi", max_steps=SERVER_DEFAULT)
+    else:
+        await client.chat.start(agent_id="agt_1", message="hi")
+
+    assert "max_steps" not in json.loads(route.calls.last.request.content)["options"]
+
+
+@pytest.mark.parametrize("bad", [None, 0, -1, 2.5, True, "5"])
+async def test_invalid_max_steps_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter, bad: object
+) -> None:
+    route = mock_api.post("/chat")
+
+    with pytest.raises(InvalidParams) as exc:
+        await client.chat.start(
+            agent_id="agt_1",
+            message="hi",
+            max_steps=bad,  # type: ignore[arg-type]
+        )
+
+    assert exc.value.errors[0]["param"] == "max_steps"
     assert not route.called
 
 

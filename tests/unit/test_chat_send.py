@@ -9,7 +9,7 @@ import httpx
 import pytest
 import respx
 
-from cominty_sdk import AssistantRun, AsyncCominty, InvalidParams
+from cominty_sdk import SERVER_DEFAULT, AssistantRun, AsyncCominty, InvalidParams
 
 # Mirror the canonical ids in conftest (tests/ is not an importable package).
 THREAD_ID = "11111111-1111-1111-1111-111111111111"
@@ -68,6 +68,56 @@ async def test_accepts_uuid_thread_id(
     await client.chat.send(UUID(THREAD_ID), message="hi", agent_id="agt_1")
 
     assert route.called
+
+
+async def test_sends_max_steps_in_options_when_provided(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_message: MakeMessage
+) -> None:
+    route = mock_api.post(f"/chat/{THREAD_ID}").mock(
+        return_value=httpx.Response(
+            200, json=make_message(id=ASSISTANT_MSG_ID, role="assistant", live=True)
+        )
+    )
+
+    await client.chat.send(THREAD_ID, message="yes, continue", agent_id="agt_1", max_steps=10)
+
+    assert json.loads(route.calls.last.request.content)["options"]["max_steps"] == 10
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+async def test_omits_max_steps_for_the_server_default(
+    client: AsyncCominty, mock_api: respx.MockRouter, make_message: MakeMessage, explicit: bool
+) -> None:
+    route = mock_api.post(f"/chat/{THREAD_ID}").mock(
+        return_value=httpx.Response(
+            200, json=make_message(id=ASSISTANT_MSG_ID, role="assistant", live=True)
+        )
+    )
+
+    if explicit:
+        await client.chat.send(THREAD_ID, message="hi", agent_id="agt_1", max_steps=SERVER_DEFAULT)
+    else:
+        await client.chat.send(THREAD_ID, message="hi", agent_id="agt_1")
+
+    assert "max_steps" not in json.loads(route.calls.last.request.content)["options"]
+
+
+@pytest.mark.parametrize("bad", [None, 0, -1, 2.5, True, "5"])
+async def test_invalid_max_steps_raises_invalid_params(
+    client: AsyncCominty, mock_api: respx.MockRouter, bad: object
+) -> None:
+    route = mock_api.post(f"/chat/{THREAD_ID}")
+
+    with pytest.raises(InvalidParams) as exc:
+        await client.chat.send(
+            THREAD_ID,
+            message="hi",
+            agent_id="agt_1",
+            max_steps=bad,  # type: ignore[arg-type]
+        )
+
+    assert exc.value.errors[0]["param"] == "max_steps"
+    assert not route.called
 
 
 async def test_validation_fires_before_request(

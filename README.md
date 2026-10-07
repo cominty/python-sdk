@@ -158,6 +158,32 @@ reply = await client.chat.send(run.thread.id, agent_id=AGENT_ID, message="Tomorr
 print(await reply.text())
 ```
 
+### Cap the agent's tool rounds
+
+`max_steps` limits how many tool rounds (web search, file write, ...) the agent
+may run for **one message**. Reaching it is not an error: the agent stops using
+tools, recaps, and asks whether to continue, and the message ends with
+`status="success"`. Continue with a normal follow-up.
+
+```python
+run = await client.chat.start(
+    agent_id=AGENT_ID, message="Research X, then write it up.", max_steps=5
+)
+await run.text()
+
+# The cap is per message: pass it again to keep it. Leaving it out runs with
+# the server default (60 today).
+reply = await client.chat.send(
+    run.thread.id, agent_id=AGENT_ID, message="Yes, continue.", max_steps=10
+)
+print(await reply.text())
+```
+
+Leave `max_steps` unset (or pass `SERVER_DEFAULT`) to omit it from the request.
+There is no "unlimited": `None` and integers below 1 raise `InvalidParams`. No
+field tells you the cap was hit, and the reply wording is model-written, so don't
+parse it. See [`examples/10_max_steps.py`](examples/10_max_steps.py).
+
 ### Manage threads
 
 `client.threads` is scoped to the client's `user_id` automatically.
@@ -248,6 +274,7 @@ Runnable scripts for each scenario live in [`examples/`](examples/):
 | [`06_manage_thread.py`](examples/06_manage_thread.py) | Get, rename/star, archive |
 | [`07_custom_agent.py`](examples/07_custom_agent.py) | Call a custom managed agent (your own model + instructions) |
 | [`08_mcp_linear.py`](examples/08_mcp_linear.py) | Custom agent pulls live context from an MCP server (Linear) |
+| [`10_max_steps.py`](examples/10_max_steps.py) | Cap tool rounds per message, then continue past the cap |
 
 They render colored, aligned output with [`rich`](https://github.com/Textualize/rich),
 which ships in the dev extras:
@@ -272,6 +299,7 @@ Both `chat.start` and `chat.send` accept:
 | `document_ids` | `list[str]` | Restrict retrieval to specific documents. |
 | `disabled_tools` | `list[str]` | Turn tools off: `"web"`, `"company_documents"`, `"mcp:<server>"`, or `"mcp:*"` for all MCP. |
 | `memory_namespace` | `str` | `start` only: the memory bag for this thread (max 128 chars), frozen for its lifetime. A follow-up cannot change it. |
+| `max_steps` | `int` | Cap on tool rounds for **this message** (integer `>= 1`). Per message, not per thread. Unset (or `SERVER_DEFAULT`) means the server default, 60 today. |
 
 Invalid values raise `InvalidParams` **before** any request is sent.
 
