@@ -55,6 +55,16 @@ async def test_cancel_message(creds: tuple[str, str], agent_id: str) -> None:
 
 
 @pytest.mark.asyncio
+async def test_export_message(creds: tuple[str, str], agent_id: str) -> None:
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        run = await client.chat.start(agent_id=agent_id, message="Reply with exactly: pong")
+        reply = await run.result()
+        exported = await client.chat.export(reply.id, format="pdf")
+        assert exported.startswith(b"%PDF")
+
+
+@pytest.mark.asyncio
 async def test_memory_lifecycle(creds: tuple[str, str]) -> None:
     api_key, user_id = creds
     async with AsyncCominty(api_token=api_key, user_id=user_id) as client:

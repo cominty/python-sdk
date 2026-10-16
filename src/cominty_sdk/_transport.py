@@ -39,6 +39,16 @@ class AsyncTransport:
         )
         return _safe_json(response)
 
+    async def request_bytes(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, Any] | None = None,
+    ) -> bytes:
+        response = await _send(self._client, method, path, action="Request to", params=params)
+        return response.content
+
     @asynccontextmanager
     async def stream_lines(
         self,

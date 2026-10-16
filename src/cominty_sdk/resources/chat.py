@@ -9,6 +9,8 @@ from cominty_sdk.exceptions import InvalidParams, SDKError
 from cominty_sdk.models.capabilities import AgentCapabilities, MessageScope
 from cominty_sdk.models.chat import (
     SERVER_DEFAULT,
+    ExportFormat,
+    ExportMessageParams,
     MaxSteps,
     Message,
     MessageRole,
@@ -177,6 +179,38 @@ class ChatResource:
         """
         raw = await self._transport.request("POST", f"/chat/messages/{_as_uuid(message_id)}/cancel")
         return Message.model_validate(raw)
+
+    async def export(self, message_id: str | UUID, *, format: ExportFormat) -> bytes:
+        """
+        Export a finished message as a document.
+
+        Sends ``GET /chat/messages/{message_id}/export``. The server renders the
+        message content (Markdown) to the requested format and returns the file.
+        No file name comes back: pick one yourself when you write the bytes.
+
+        Args:
+            message_id (str | UUID): Message to export.
+            format (ExportFormat): ``"pdf"`` or ``"docx"``.
+
+        Returns:
+            bytes: The file content.
+
+        Raises:
+            ValueError: ``message_id`` is not a UUID.
+            InvalidParams: ``format`` is not ``"pdf"`` or ``"docx"``.
+            NotFoundError: No such message for this API key.
+            APIError: The message has no content (400), for instance because it is
+                still running.
+        """
+        try:
+            params = ExportMessageParams(format=format)
+        except ValidationError as exc:
+            raise InvalidParams.from_validation_error(exc, context="chat.export") from None
+        return await self._transport.request_bytes(
+            "GET",
+            f"/chat/messages/{_as_uuid(message_id)}/export",
+            params={"format": params.format},
+        )
 
     def _build_body(
         self,

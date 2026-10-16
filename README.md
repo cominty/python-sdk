@@ -206,6 +206,27 @@ already cancelled raises `APIError` (status 400, `"Message is not live"`), so a
 "stop" button should treat that error as "too late". An unknown message raises
 `NotFoundError`. See [`examples/12_cancel_message.py`](examples/12_cancel_message.py).
 
+### Export a message as a document
+
+`chat.export(message_id, format=...)` renders a finished message to a file and
+returns its bytes. `format` is `"pdf"` or `"docx"` (any other value raises
+`InvalidParams` before a request is sent).
+
+```python
+from pathlib import Path
+
+run = await client.chat.start(agent_id=AGENT_ID, message="Write a short product brief.")
+reply = await run.result()
+
+pdf = await client.chat.export(reply.id, format="pdf")
+Path("brief.pdf").write_bytes(pdf)
+```
+
+The server sends no file name, so pick one when you write the bytes. A message
+without content (for instance one still running) raises `APIError` (status 400,
+`"Message has no content"`). See
+[`examples/13_export_message.py`](examples/13_export_message.py).
+
 ### Manage threads
 
 `client.threads` is scoped to the client's `user_id` automatically.
@@ -372,6 +393,7 @@ Runnable scripts for each scenario live in [`examples/`](examples/):
 | [`10_max_steps.py`](examples/10_max_steps.py) | Cap tool rounds per message, then continue past the cap |
 | [`11_capabilities.py`](examples/11_capabilities.py) | Thread and message capabilities |
 | [`12_cancel_message.py`](examples/12_cancel_message.py) | Stop a message that is still being generated |
+| [`13_export_message.py`](examples/13_export_message.py) | Export a finished message as a PDF or DOCX file |
 
 They render colored, aligned output with [`rich`](https://github.com/Textualize/rich),
 which ships in the dev extras:

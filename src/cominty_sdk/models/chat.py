@@ -27,11 +27,13 @@ __all__ = [
     "validate_user_id",
     "SERVER_DEFAULT",
     "MaxSteps",
+    "ExportFormat",
     # request models
     "HumanMessage",
     "StartChatOptions",
     "StartChatParams",
     "UpdateThreadParams",
+    "ExportMessageParams",
     # response models
     "Question",
     "Agent",
@@ -108,6 +110,10 @@ MaxSteps: TypeAlias = Union[int, Literal[_ServerDefaultType.SERVER_DEFAULT]]
 """A tool-round cap: an integer ``>= 1``, or ``SERVER_DEFAULT`` to omit it."""
 
 
+ExportFormat: TypeAlias = Literal["pdf", "docx"]
+"""A document format a finished message can be exported to."""
+
+
 # --------------------------------------------------------------------------- #
 # Request models  (strict: reject unknown fields, no coercion)
 # --------------------------------------------------------------------------- #
@@ -157,6 +163,12 @@ class UpdateThreadParams(BaseModel):
 
     name: str | None = None
     starred: bool | None = None
+
+
+class ExportMessageParams(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    format: ExportFormat
 
 
 # --------------------------------------------------------------------------- #

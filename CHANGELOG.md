@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cancelled`. It is not idempotent: a message that is no longer running (finished, failed,
   already cancelled, or a user message) raises `APIError` (400), and an unknown message raises
   `NotFoundError`. See `examples/12_cancel_message.py`.
+- `client.chat.export(message_id, format="pdf" | "docx")`: renders a message to a document
+  (`GET /chat/messages/{id}/export`) and returns the raw bytes. The server sends no file name.
+  Any other `format` raises `InvalidParams` locally; a message without content (for instance
+  one still running) raises `APIError` (400). New public type `ExportFormat`. See
+  `examples/13_export_message.py`.
 
 ## [1.0.0] - 2026-10-15
 
