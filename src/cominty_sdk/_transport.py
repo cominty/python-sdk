@@ -34,15 +34,9 @@ class AsyncTransport:
         json_body: Any = None,  # noqa: ANN401 - arbitrary JSON request body
         params: Mapping[str, Any] | None = None,
     ) -> Any:  # noqa: ANN401 - decoded JSON; resources validate into models
-        try:
-            response = await self._client.request(method, path, json=json_body, params=params)
-        except httpx.TimeoutException as exc:
-            raise APIConnectionError(f"Request to {path} timed out") from exc
-        except httpx.RequestError as exc:
-            raise APIConnectionError(f"Request to {path} failed: {exc}") from exc
-
-        if response.is_error:
-            raise error_from_response(response.status_code, _safe_json(response), response.headers)
+        response = await _send(
+            self._client, method, path, action="Request to", json=json_body, params=params
+        )
         return _safe_json(response)
 
     @asynccontextmanager
@@ -71,6 +65,26 @@ class AsyncTransport:
 
     async def aclose(self) -> None:
         await self._client.aclose()
+
+
+async def _send(
+    client: httpx.AsyncClient,
+    method: str,
+    url: str,
+    *,
+    action: str,
+    **kwargs: Any,  # noqa: ANN401 - forwarded untouched to httpx.AsyncClient.request
+) -> httpx.Response:
+    try:
+        response = await client.request(method, url, **kwargs)
+    except httpx.TimeoutException as exc:
+        raise APIConnectionError(f"{action} {url} timed out") from exc
+    except httpx.RequestError as exc:
+        raise APIConnectionError(f"{action} {url} failed: {exc}") from exc
+
+    if response.is_error:
+        raise error_from_response(response.status_code, _safe_json(response), response.headers)
+    return response
 
 
 async def _iter_json_lines(response: httpx.Response) -> AsyncIterator[dict[str, Any]]:
