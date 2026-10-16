@@ -227,6 +227,39 @@ without content (for instance one still running) raises `APIError` (status 400,
 `"Message has no content"`). See
 [`examples/13_export_message.py`](examples/13_export_message.py).
 
+### Give the agent files
+
+`chat.upload_file` registers a file, and its `id` goes in `file_ids` (5 files per message at
+most). Pass raw bytes (then `filename` is required) or a `pathlib.Path` (the name and the
+mimetype are inferred from it, and both can still be overridden).
+
+```python
+from pathlib import Path
+
+report = await client.chat.upload_file(Path("q3-report.pdf"))
+data = await client.chat.upload_file(b"a,b\n1,2\n", filename="data.csv")
+
+run = await client.chat.start(
+    agent_id=AGENT_ID, message="Compare these two files.", file_ids=[report.id, data.id]
+)
+reply = await run.result()
+
+# Download any conversation file by id, including the ones the agent produced.
+# Keep only the last path segment: file names are not under your control.
+for file in reply.files:
+    Path(Path(file.name).name).write_bytes(await client.chat.download_file(file.id))
+```
+
+A plain `str` is rejected (`InvalidParams`): it would be ambiguous between a path and text, so
+wrap a path in `Path(...)`. The bytes go straight to the storage backend through a presigned
+URL: your API key is only ever sent to the Cominty API. A file is at most 500 MiB: a bigger one
+raises `InvalidParams` before anything is sent. The server also caps the number of uploads per
+day per organization, and another deployment may set a lower size limit; such a refusal raises
+`APIError` with the storage reason (for instance `EntityTooLarge`). The API has no way to delete or list uploaded files.
+Files are held in memory, in both directions. Error messages never show a presigned URL's
+signature, but `httpx` itself logs full request URLs at `INFO`: keep its logger at `WARNING`.
+See [`examples/14_upload_files.py`](examples/14_upload_files.py).
+
 ### Manage threads
 
 `client.threads` is scoped to the client's `user_id` automatically.
@@ -394,6 +427,7 @@ Runnable scripts for each scenario live in [`examples/`](examples/):
 | [`11_capabilities.py`](examples/11_capabilities.py) | Thread and message capabilities |
 | [`12_cancel_message.py`](examples/12_cancel_message.py) | Stop a message that is still being generated |
 | [`13_export_message.py`](examples/13_export_message.py) | Export a finished message as a PDF or DOCX file |
+| [`14_upload_files.py`](examples/14_upload_files.py) | Upload files, attach them to a message, download one back |
 
 They render colored, aligned output with [`rich`](https://github.com/Textualize/rich),
 which ships in the dev extras:
@@ -413,7 +447,7 @@ Both `chat.start` and `chat.send` accept:
 | `agent_id` | `str` | **Required.** The agent to run. |
 | `message` | `str` | **Required.** The user's message (max 30,000 chars). |
 | `name` | `str` | `start` only: names the new thread. |
-| `file_ids` | `list[str]` | Attach previously-uploaded files (max 5). |
+| `file_ids` | `list[str]` | Ids of files uploaded with `chat.upload_file()` (max 5). |
 | `thread_capabilities` | `AgentCapabilities` | `start` only: capability override, frozen for the thread. Includes the memory bag (`MemoryCapability`). |
 | `message_scope` | `MessageScope` | Turn capabilities on/off or narrow them for this message (sent as `message.scope`). |
 | `max_steps` | `int` | Cap on tool rounds for **this message** (integer `>= 1`). Per message, not per thread. Unset (or `SERVER_DEFAULT`) means the server default, 60 today. |

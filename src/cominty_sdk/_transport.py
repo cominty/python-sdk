@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import html
 import json
+import re
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from typing import Any
@@ -10,7 +12,7 @@ from typing import Any
 import httpx
 
 from ._config import Config
-from .exceptions import APIConnectionError, error_from_response
+from .exceptions import APIConnectionError, SDKError, error_from_response
 
 __all__ = ["AsyncTransport"]
 
@@ -49,6 +51,39 @@ class AsyncTransport:
         response = await _send(self._client, method, path, action="Request to", params=params)
         return response.content
 
+    async def upload_to_presigned_url(
+        self,
+        url: str,
+        *,
+        fields: Mapping[str, str],
+        filename: str,
+        content: bytes,
+        mimetype: str,
+    ) -> str:
+        # Never reuse self._client here: it carries x-cominty-token, which must not
+        # reach the storage host. See AGENTS.md section 7.4.
+        async with httpx.AsyncClient(timeout=self._config.timeout) as storage_client:
+            response = await _send(
+                storage_client,
+                "POST",
+                url,
+                action="Upload to",
+                data=dict(fields),
+                files={"file": (filename, content, mimetype)},
+            )
+        _require_success(response)
+        etag = response.headers.get("ETag")
+        if etag is None:
+            raise SDKError("the storage backend accepted the upload but sent no ETag header")
+        return etag
+
+    async def download_from_presigned_url(self, url: str) -> bytes:
+        # Fresh client for the same reason as upload_to_presigned_url.
+        async with httpx.AsyncClient(timeout=self._config.timeout) as storage_client:
+            response = await _send(storage_client, "GET", url, action="Download from")
+        _require_success(response)
+        return response.content
+
     @asynccontextmanager
     async def stream_lines(
         self,
@@ -85,15 +120,20 @@ async def _send(
     action: str,
     **kwargs: Any,  # noqa: ANN401 - forwarded untouched to httpx.AsyncClient.request
 ) -> httpx.Response:
+    # A presigned URL carries its signature in the query string: keep it out of errors.
+    target = url.split("?", 1)[0].split("#", 1)[0]
     try:
         response = await client.request(method, url, **kwargs)
     except httpx.TimeoutException as exc:
-        raise APIConnectionError(f"{action} {url} timed out") from exc
+        raise APIConnectionError(f"{action} {target} timed out") from exc
     except httpx.RequestError as exc:
-        raise APIConnectionError(f"{action} {url} failed: {exc}") from exc
+        raise APIConnectionError(f"{action} {target} failed: {exc}") from exc
 
     if response.is_error:
-        raise error_from_response(response.status_code, _safe_json(response), response.headers)
+        body = _safe_json(response)
+        if body is None:
+            body = _storage_error_body(response)
+        raise error_from_response(response.status_code, body, response.headers)
     return response
 
 
@@ -111,6 +151,32 @@ async def _iter_json_lines(response: httpx.Response) -> AsyncIterator[dict[str, 
             continue
         if isinstance(obj, dict):
             yield obj
+
+
+_STORAGE_ERROR_CODE = re.compile(r"<Code>(.*?)</Code>", re.DOTALL)
+_STORAGE_ERROR_MESSAGE = re.compile(r"<Message>(.*?)</Message>", re.DOTALL)
+
+
+def _storage_error_body(response: httpx.Response) -> dict[str, str] | None:
+    # S3 answers errors with XML, not JSON: surface its Code and Message as the detail.
+    if "xml" not in response.headers.get("content-type", ""):
+        return None
+    code = _STORAGE_ERROR_CODE.search(response.text)
+    if code is None:
+        return None
+    message = _STORAGE_ERROR_MESSAGE.search(response.text)
+    detail = html.unescape(code.group(1))
+    if message is not None:
+        detail = f"{detail}: {html.unescape(message.group(1))}"
+    return {"detail": detail}
+
+
+def _require_success(response: httpx.Response) -> None:
+    # The storage client does not follow redirects, and a presigned URL cannot survive
+    # one: a 3xx is a failure, not an empty success.
+    if not response.is_success:
+        body = {"detail": "the storage backend answered with a redirect instead of the file"}
+        raise error_from_response(response.status_code, body, response.headers)
 
 
 def _safe_json(response: httpx.Response) -> Any:  # noqa: ANN401 - decoded JSON

@@ -65,6 +65,16 @@ async def test_export_message(creds: tuple[str, str], agent_id: str) -> None:
 
 
 @pytest.mark.asyncio
+async def test_upload_and_download_file(creds: tuple[str, str]) -> None:
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        content = b"hello from the integration test"
+        uploaded = await client.chat.upload_file(content, filename="smoke.txt")
+        assert uploaded.name == "smoke.txt"
+        assert await client.chat.download_file(uploaded.id) == content
+
+
+@pytest.mark.asyncio
 async def test_memory_lifecycle(creds: tuple[str, str]) -> None:
     api_key, user_id = creds
     async with AsyncCominty(api_token=api_key, user_id=user_id) as client:

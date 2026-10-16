@@ -289,6 +289,17 @@ Use CRUD verbs: `create`, `get`, `list`, `update`, `delete`. Use domain verbs fo
 Prefer a typed `Params` model as the sole positional argument for complex inputs.
 Simple identifiers (e.g. `thread_id`) are keyword-only args, never inside a Params model.
 
+### 7.4 Third-party storage URLs
+
+Some endpoints hand back a presigned URL to a storage backend (S3, etc.) instead of, or in
+addition to, talking to the Cominty API directly: file upload and download. Never reuse the
+client's main `httpx.AsyncClient` for that URL: it carries `x-cominty-token` as a default
+header, which must never reach a third-party host. Build a fresh, unauthenticated client
+instead. See `AsyncTransport.upload_to_presigned_url` / `download_from_presigned_url`. A
+presigned URL carries its signature in the query string, so error messages only ever show
+the URL without it, and a response that should hold presigned data is never echoed in a raw
+validation error. A storage answer that is not a 2xx (a redirect included) is an error.
+
 ---
 
 ## 8. Toolchain

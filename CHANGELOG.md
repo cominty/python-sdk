@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-16
+
 ### Added
 - `client.chat.cancel(message_id)`: stops an assistant message that is still being generated
   (`POST /chat/messages/{id}/cancel`) and returns the `Message` with `status` set to
@@ -18,6 +20,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Any other `format` raises `InvalidParams` locally; a message without content (for instance
   one still running) raises `APIError` (400). New public type `ExportFormat`. See
   `examples/13_export_message.py`.
+- `client.chat.upload_file(file, *, filename=None, mimetype=None)`: uploads a file for use in
+  `file_ids` and returns the `ConversationFile`. `file` is raw bytes (`filename` required) or
+  a `pathlib.Path` (name and mimetype inferred, falling back to `application/octet-stream`).
+  A plain `str`, or anything else that is neither bytes nor a path, raises `InvalidParams`
+  (a `str` is ambiguous between a path and text). An empty `mimetype` is rejected, and so is a
+  file over 500 MiB (the hosted API's limit), before any request. The file is read off the
+  event loop and held in memory. It runs the presigned flow (`GET /chat/files/upload`, a
+  direct upload to storage, then `POST /chat/files` with the storage ETag as received). A
+  storage refusal (a lower limit on another deployment, the daily quota) raises `APIError`
+  carrying the storage reason (such as `EntityTooLarge`); so does a storage redirect, which
+  is never followed.
+- `client.chat.download_file(file_id)`: returns a conversation file's bytes
+  (`GET /chat/files/{id}` answers with a presigned URL, which is then fetched). `file_id` is
+  percent-encoded in the path, and an empty one raises `ValueError`. Neither call sends the
+  Cominty API token to the storage backend, and presigned URL signatures are kept out of error
+  messages and out of raw validation errors. See `examples/14_upload_files.py`.
+
+### Changed
+- The `ValueError` that `chat.stream()` raises for a malformed message id now names the
+  argument (`message_id must be a UUID, got 'x'`). It is still a `ValueError`.
 
 ## [1.0.0] - 2026-10-15
 

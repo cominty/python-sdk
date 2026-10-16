@@ -39,5 +39,6 @@ python examples/01_stream_events.py
 | [`11_capabilities.py`](11_capabilities.py) | Thread and message capabilities |
 | [`12_cancel_message.py`](12_cancel_message.py) | Stop a message that is still being generated |
 | [`13_export_message.py`](13_export_message.py) | Export a finished message as a PDF or DOCX file |
+| [`14_upload_files.py`](14_upload_files.py) | Upload files, attach them to a message, download one back |
 
 > Shared client setup lives in [`_shared.py`](_shared.py).

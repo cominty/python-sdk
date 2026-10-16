@@ -34,10 +34,13 @@ __all__ = [
     "StartChatParams",
     "UpdateThreadParams",
     "ExportMessageParams",
+    "UploadFileParams",
+    "ConfirmFileUploadParams",
     # response models
     "Question",
     "Agent",
     "ShareLink",
+    "FileUploadPermission",
     "ConversationFile",
     "Message",
     "ThreadSummary",
@@ -48,6 +51,8 @@ __all__ = [
 _CONTENT_MAX_LENGTH = 30_000
 # Max files per message (settings.CHAT_MESSAGE_MAX_FILES).
 _MAX_FILES = 5
+# Max file name length enforced server-side on GET /chat/files/upload.
+_FILENAME_MAX_LENGTH = 255
 
 
 # --------------------------------------------------------------------------- #
@@ -171,6 +176,20 @@ class ExportMessageParams(BaseModel):
     format: ExportFormat
 
 
+class UploadFileParams(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    filename: str = Field(min_length=1, max_length=_FILENAME_MAX_LENGTH, pattern=r"^[^/]+$")
+    mimetype: str = Field(min_length=1)
+
+
+class ConfirmFileUploadParams(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    etag: str
+    key: str
+
+
 # --------------------------------------------------------------------------- #
 # Response models  (lenient: ignore unknown fields)
 # --------------------------------------------------------------------------- #
@@ -200,6 +219,20 @@ class ShareLink(BaseModel):
     expired: bool
     protected: bool
     url: str
+
+
+class FileUploadPermission(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    url: str
+    fields: dict[str, str]
+
+    @field_validator("fields")
+    @classmethod
+    def _require_key(cls, value: dict[str, str]) -> dict[str, str]:
+        if "key" not in value:
+            raise ValueError("the upload permission has no 'key' field")
+        return value
 
 
 class ConversationFile(BaseModel):
