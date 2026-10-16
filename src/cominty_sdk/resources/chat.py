@@ -154,6 +154,30 @@ class ChatResource:
         """
         return AssistantRun(self._transport, _as_uuid(message_id))
 
+    async def cancel(self, message_id: str | UUID) -> Message:
+        """
+        Cancel an assistant message that is still being generated.
+
+        Sends ``POST /chat/messages/{message_id}/cancel``. The status flips to
+        ``cancelled`` right away, and whatever the agent produced before that
+        is kept in ``events``. Not idempotent: cancelling a message that is
+        no longer running raises.
+
+        Args:
+            message_id (str | UUID): Assistant message to cancel.
+
+        Returns:
+            Message: The message, with ``status`` set to ``MessageStatus.cancelled``.
+
+        Raises:
+            ValueError: ``message_id`` is not a UUID.
+            NotFoundError: No such message for this API key.
+            APIError: The message is not live (400): it already finished, failed,
+                or was already cancelled. User messages are never live.
+        """
+        raw = await self._transport.request("POST", f"/chat/messages/{_as_uuid(message_id)}/cancel")
+        return Message.model_validate(raw)
+
     def _build_body(
         self,
         *,
@@ -203,4 +227,9 @@ def _live_assistant_message(thread: Thread) -> Message:
 
 
 def _as_uuid(message_id: str | UUID) -> UUID:
-    return message_id if isinstance(message_id, UUID) else UUID(message_id)
+    if isinstance(message_id, UUID):
+        return message_id
+    try:
+        return UUID(message_id)
+    except ValueError:
+        raise ValueError(f"message_id must be a UUID, got {message_id!r}") from None

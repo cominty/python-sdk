@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `client.chat.cancel(message_id)`: stops an assistant message that is still being generated
+  (`POST /chat/messages/{id}/cancel`) and returns the `Message` with `status` set to
+  `cancelled`. It is not idempotent: a message that is no longer running (finished, failed,
+  already cancelled, or a user message) raises `APIError` (400), and an unknown message raises
+  `NotFoundError`. See `examples/12_cancel_message.py`.
+
 ## [1.0.0] - 2026-10-15
 
 ### Added

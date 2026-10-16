@@ -184,6 +184,28 @@ There is no "unlimited": `None` and integers below 1 raise `InvalidParams`. No
 field tells you the cap was hit, and the reply wording is model-written, so don't
 parse it. See [`examples/10_max_steps.py`](examples/10_max_steps.py).
 
+### Stop a message
+
+`chat.cancel(message_id)` stops an assistant message that is still being generated
+and returns it with `status` set to `cancelled`. It takes effect immediately, and
+what the agent produced so far stays in `events`.
+
+```python
+run = await client.chat.start(agent_id=AGENT_ID, message="Write a very long report.")
+
+async with run:  # closes the event stream when we leave the block
+    async for event in run:
+        if user_clicked_stop():
+            message = await client.chat.cancel(run.message_id)
+            print(message.status)  # MessageStatus.cancelled
+            break
+```
+
+Cancelling is not idempotent: a message that already finished, failed, or was
+already cancelled raises `APIError` (status 400, `"Message is not live"`), so a
+"stop" button should treat that error as "too late". An unknown message raises
+`NotFoundError`. See [`examples/12_cancel_message.py`](examples/12_cancel_message.py).
+
 ### Manage threads
 
 `client.threads` is scoped to the client's `user_id` automatically.
@@ -349,6 +371,7 @@ Runnable scripts for each scenario live in [`examples/`](examples/):
 | [`08_mcp_linear.py`](examples/08_mcp_linear.py) | Custom agent pulls live context from an MCP server (Linear) |
 | [`10_max_steps.py`](examples/10_max_steps.py) | Cap tool rounds per message, then continue past the cap |
 | [`11_capabilities.py`](examples/11_capabilities.py) | Thread and message capabilities |
+| [`12_cancel_message.py`](examples/12_cancel_message.py) | Stop a message that is still being generated |
 
 They render colored, aligned output with [`rich`](https://github.com/Textualize/rich),
 which ships in the dev extras:
