@@ -8,9 +8,8 @@ live context from the **Linear MCP server** instead of being handed the data.
 The agent looks up Hiroshi's tasks in the current sprint, then reports them in
 its own tone: a clean, non-technical French summary for leadership.
 
-Prerequisites (configured on the platform, not in code):
-- The Linear MCP server is connected to your org / available to the agent.
-- The custom agent has tools (MCP) enabled.
+The script checks ``client.mcp.list()`` first and stops when ``linear`` is not an
+enabled server for this key.
 
 Capability control is per message: capabilities are on by default and you turn off
 what you don't want with ``MessageScope``. Here we turn off web search and
@@ -43,6 +42,14 @@ async def main() -> None:
         return
 
     async with make_client() as client:
+        servers = await client.mcp.list()
+        if not any(server.name == "linear" for server in servers):
+            print(
+                "Linear is not an enabled MCP server for this key. "
+                "Turn it on in the platform, then re-run."
+            )
+            return
+
         pretty.panel(REQUEST, title="Request", style="yellow")
 
         run = await client.chat.start(

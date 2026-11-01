@@ -7,8 +7,8 @@
 
 Official async Python client for the Cominty managed agent chat API.
 
-Start a conversation with an agent, stream its progress live, and manage threads
-with a small, fully-typed surface that's the same on Python 3.9 through 3.13.
+Start a conversation with an agent, stream its progress live, manage threads, and set
+up agents, skills and indexed sources with a small, fully-typed surface that's the same on Python 3.9 through 3.13.
 
 ```python
 import asyncio
@@ -336,6 +336,134 @@ A few other things worth knowing:
 - A thread is attached to a bag with `MemoryCapability` in `chat.start(thread_capabilities=...)`;
   the bag is frozen once the thread starts (see [Capabilities](#capabilities)).
 
+### Index local files for an agent
+
+`client.sources` turns files on disk into a searchable document source in one call. Pass a
+file, a folder (its top-level files), or a list of files. The SDK creates the drive, uploads
+every file with a presigned URL (your API key never reaches the storage backend), creates a
+private drag-and-drop source over it, and the first sync starts.
+
+```python
+from pathlib import Path
+
+source = await client.sources.create(Path("./knowledge"), name="Product docs")
+source = await client.sources.wait_synced(source.pid)  # polls until status == "synced"
+
+# Give an agent access: capabilities take the numeric `id`, every method takes `pid`.
+# (source.drive_id names the drive behind it; you never need it.)
+agent = await client.agents.create(
+    name="Docs assistant",
+    capabilities=AgentCapabilities(
+        indexed_documents=IndexedDocumentsCapability(activation="always", source_ids=[source.id])
+    ),
+)
+
+# Add or remove files later: the source is re-synced for you.
+await client.sources.add_files(source.pid, [Path("faq.md"), Path("pricing.pdf")])
+for f in await client.sources.list_files(source.pid):
+    print(f.name, f.size)
+await client.sources.remove_file(source.pid, f.id)
+
+await client.sources.pause(source.pid)  # ... start(), sync(), archive()
+```
+
+A source holds at most 50 files, checked before the first upload. `wait_synced` raises
+`SourceSyncFailed` (with `.source`) if the source stops in `error`, `paused`, `archived`
+or `daily_quota_reached`, and `asyncio.TimeoutError` after `timeout` seconds (600 by default).
+
+> **Known limitation.** Sources created with an API key are private to the admin who minted
+> the key. A chat that searches them must use that admin's Clerk id as the client's `user_id`:
+> it is `agent.owner` on any agent the key created. With another `user_id`, the agent's
+> document tool reports no authorized source.
+
+### Agents
+
+`client.agents` lists the agents a key can use (built-in Cominty agents, organization agents,
+and the key owner's own) and manages custom ones.
+
+```python
+for a in await client.agents.list():
+    print(a.id, a.name, a.managed, a.scope)
+
+models = await client.agents.list_models()  # selectable model catalog
+
+agent = await client.agents.create(
+    name="Support",
+    instructions="Answer from the docs. Be brief.",
+    scope="organization",  # default "private"
+    capabilities=AgentCapabilities(web=WebCapability(activation="never")),
+    model_ids=[models[0].id],  # failover chain; omit for the default
+)
+
+# Partial update: only the arguments you pass are sent. None clears description,
+# instructions or capabilities; a capabilities object is merged key by key.
+agent = await client.agents.update(agent.id, instructions=None, capabilities=None)
+agent = await client.agents.set_models(agent.id, model_ids=[models[1].id, models[0].id])
+await client.agents.delete(agent.id)  # permanent
+```
+
+### Skills
+
+A skill is a folder with a `SKILL.md` (YAML frontmatter per the
+[agentskills.io](https://agentskills.io/specification) specification) plus any supporting
+files. `client.skills.create` zips a folder in memory; a `.zip` path or raw bytes are sent
+as they are.
+
+```python
+skill = await client.skills.create(Path("./skills/release-notes"), display_name="Release notes")
+print(skill.frontmatter.name, skill.source)  # parsed by the server; "custom"
+
+# Give it to an agent
+await client.agents.update(
+    agent.id,
+    capabilities=AgentCapabilities(
+        skills=SkillsCapability(activation="always", include=[skill.id])
+    ),
+)
+
+await client.skills.update(skill.id, active=False)  # or display_name=, scope=
+await client.skills.upload_version(skill.id, Path("./skills/release-notes"))  # becomes default
+await client.skills.delete(skill.id)  # permanent, every version
+```
+
+Frontmatter and zip-layout errors come back from the server as `APIError` (422) with the
+reason. Two `upload_version` calls on the same skill within one second collide: space them out.
+
+### Documents
+
+Agent citations carry a composite document id. `client.documents.get(document_id)` resolves it
+to its source (`source_pid`, `source_type`) and file (`document_name`, `document_mime_type`).
+
+### MCP servers
+
+`client.mcp.list()` reads `GET /mcp/manifest`: the MCP integrations this key can use.
+A server's `name` is what `McpCapability.connections` and `McpScope.connections` store.
+The endpoint returns every server; `enabled` filters on `is_enabled` in the SDK.
+
+```python
+servers = await client.mcp.list()  # turned on for this key
+for server in servers:
+    print(server.title, server.name, server.requires_oauth_connect)
+
+everything = await client.mcp.list(enabled=None)  # disabled ones too
+off = await client.mcp.list(enabled=False)
+
+agent = await client.agents.create(
+    name="Linear helper",
+    capabilities=AgentCapabilities(
+        mcp=McpCapability(
+            activation="always",
+            connections=[server.name for server in servers],
+        ),
+    ),
+)
+```
+
+`title` and `description` are what to show. Pass `enabled=None` to see servers this key
+has not turned on, and leave those out of `connections`. Optional fields
+(`connection_status`, `icon_uri`, `mcp_url`, `owner_id`, `created_at`, `updated_at`)
+are `None` when the API omits them.
+
 ### Capabilities
 
 A capability is something the agent may use: `web`, `indexed_documents`, `mcp`, `skills`,
@@ -399,6 +527,8 @@ await client.chat.send(
   `"*"`, no restriction), so passing `ALL` only makes the intent explicit. A capability you send
   replaces the stored one, so an omitted filter resets to `ALL`. Otherwise pass a non-empty
   list: `None`, `[]` and a `"*"` inside a list raise `InvalidParams`.
+- `connections` on `McpCapability` and `McpScope` takes `McpServerOut.name`, from
+  `client.mcp.list()`.
 - `"never"` and `enabled=False` send nothing else: passing a filter with them raises
   `InvalidParams`.
 - `MemoryCapability(activation="always", namespace=...)` attaches the thread to a memory bag,
@@ -428,6 +558,10 @@ Runnable scripts for each scenario live in [`examples/`](examples/):
 | [`12_cancel_message.py`](examples/12_cancel_message.py) | Stop a message that is still being generated |
 | [`13_export_message.py`](examples/13_export_message.py) | Export a finished message as a PDF or DOCX file |
 | [`14_upload_files.py`](examples/14_upload_files.py) | Upload files, attach them to a message, download one back |
+| [`15_sources.py`](examples/15_sources.py) | Index a local folder, give it to an agent, ask about it |
+| [`16_agents.py`](examples/16_agents.py) | Create, update and delete a custom agent |
+| [`17_skills.py`](examples/17_skills.py) | Upload a skill folder and attach it to an agent |
+| [`19_mcp_servers.py`](examples/19_mcp_servers.py) | List MCP servers and attach the enabled ones to an agent |
 
 They render colored, aligned output with [`rich`](https://github.com/Textualize/rich),
 which ships in the dev extras:

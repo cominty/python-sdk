@@ -40,5 +40,9 @@ python examples/01_stream_events.py
 | [`12_cancel_message.py`](12_cancel_message.py) | Stop a message that is still being generated |
 | [`13_export_message.py`](13_export_message.py) | Export a finished message as a PDF or DOCX file |
 | [`14_upload_files.py`](14_upload_files.py) | Upload files, attach them to a message, download one back |
+| [`15_sources.py`](15_sources.py) | Index a local folder, give it to an agent, ask about it |
+| [`16_agents.py`](16_agents.py) | Create, update and delete a custom agent |
+| [`17_skills.py`](17_skills.py) | Upload a skill folder and attach it to an agent |
+| [`19_mcp_servers.py`](19_mcp_servers.py) | List MCP servers and attach the enabled ones to an agent |
 
 > Shared client setup lives in [`_shared.py`](_shared.py).

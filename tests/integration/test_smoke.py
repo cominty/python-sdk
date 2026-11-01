@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import os
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
-from cominty_sdk import AsyncCominty, ConflictError, MessageStatus, NotFoundError
+from cominty_sdk import AsyncCominty, ConflictError, McpServerOut, MessageStatus, NotFoundError
 
 pytestmark = pytest.mark.integration
 
@@ -110,3 +112,98 @@ async def test_memory_lifecycle(creds: tuple[str, str]) -> None:
 
         with pytest.raises(NotFoundError):
             await client.memory.get(path, namespace=namespace)
+
+
+@pytest.mark.asyncio
+async def test_agent_lifecycle(creds: tuple[str, str]) -> None:
+    from cominty_sdk import AgentCapabilities, WebCapability
+
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        models = await client.agents.list_models()
+        assert models
+        agent = await client.agents.create(
+            name=f"sdk-integration-{uuid4()}",
+            instructions="Reply with exactly: pong",
+            capabilities=AgentCapabilities(web=WebCapability(activation="never")),
+            model_ids=[models[0].id],
+        )
+        try:
+            fetched = await client.agents.get(agent.id)
+            assert fetched.id == agent.id
+            assert fetched.capabilities is not None
+            assert fetched.capabilities.web is not None
+            assert fetched.capabilities.web.activation == "never"
+            assert any(a.id == agent.id for a in await client.agents.list())
+
+            updated = await client.agents.update(agent.id, description="updated", instructions=None)
+            assert updated.description == "updated"
+            assert updated.instructions is None
+        finally:
+            await client.agents.delete(agent.id)
+
+        with pytest.raises(NotFoundError):
+            await client.agents.get(agent.id)
+
+
+@pytest.mark.asyncio
+async def test_skill_lifecycle(creds: tuple[str, str], tmp_path: Path) -> None:
+    api_key, user_id = creds
+    folder = tmp_path / "sdk-integration-skill"
+    folder.mkdir()
+    (folder / "SKILL.md").write_text(
+        "---\nname: sdk-integration-skill\ndescription: A throwaway skill for the SDK tests.\n---\n"
+        "Say pong.\n"
+    )
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        skill = await client.skills.create(folder, display_name=f"sdk-integration-{uuid4()}")
+        try:
+            assert skill.frontmatter.name == "sdk-integration-skill"
+            assert skill.source.value == "custom"
+            assert any(s.id == skill.id for s in await client.skills.list())
+
+            updated = await client.skills.update(skill.id, active=False)
+            assert updated.active is False
+
+            await asyncio.sleep(1.1)  # version tags are second-resolution
+            versioned = await client.skills.upload_version(skill.id, folder)
+            assert versioned.id == skill.id
+        finally:
+            await client.skills.delete(skill.id)
+
+
+@pytest.mark.asyncio
+async def test_source_lifecycle(creds: tuple[str, str], tmp_path: Path) -> None:
+    api_key, user_id = creds
+    (tmp_path / "a.md").write_text("# Atlas\n\nAtlas ships on March 3.\n")
+    (tmp_path / "b.txt").write_text("The owner is Camille.\n")
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        source = await client.sources.create(tmp_path, name=f"sdk-integration-{uuid4()}")
+        try:
+            assert source.drive_id
+            assert (await client.sources.get(source.pid)).pid == source.pid
+            files = await client.sources.list_files(source.pid)
+            assert sorted(f.name for f in files) == ["a.md", "b.txt"]
+
+            synced = await client.sources.wait_synced(source.pid, timeout=300, interval=5)
+            assert synced.status.value == "synced"
+
+            (tmp_path / "c.txt").write_text("Support costs 45.\n")
+            added = await client.sources.add_files(source.pid, [tmp_path / "c.txt"])
+            assert [f.name for f in added] == ["c.txt"]
+            assert await client.sources.download_file(added[0].id) == b"Support costs 45.\n"
+
+            await client.sources.remove_file(source.pid, added[0].id)
+            assert "c.txt" not in [f.name for f in await client.sources.list_files(source.pid)]
+        finally:
+            archived = await client.sources.archive(source.pid)
+            assert archived.status.value == "archived"
+
+
+@pytest.mark.asyncio
+async def test_list_mcp_servers(creds: tuple[str, str]) -> None:
+    api_key, user_id = creds
+    async with AsyncCominty(api_token=api_key, user_id=user_id) as client:
+        servers = await client.mcp.list(enabled=None)
+        assert isinstance(servers, list)
+        assert all(isinstance(server, McpServerOut) and server.name for server in servers)

@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `client.sources`: local files to an indexed document source in one call.
+  `create(files, name=None)` takes a file path, a folder path (its top-level files) or an
+  iterable of file paths, creates a drive, uploads every file through the presigned flow and
+  creates a private drag-and-drop source over it (`POST /drives`, `GET /drives/{id}/upload`,
+  `POST /drives/upload`, `POST /dc/sources`). `wait_synced(pid, timeout=600, interval=5)` polls
+  until `synced` and raises the new `SourceSyncFailed` (carrying `.source`) when the source
+  stops elsewhere, or `asyncio.TimeoutError`. `add_files` / `remove_file` upload or delete and
+  request a sync when the source accepts one; `list_files`, `download_file`, `list`, `get`
+  (list-and-pick: keys have no single-source read), `update(name=)`, and the status verbs
+  `start`, `pause`, `sync`, `archive`. A plain `str`, a missing file, duplicate file names or
+  more than 50 files raise `InvalidParams` before any upload. New public types `SourceOut`
+  (`id` for capabilities, `pid` for paths, `drive_id` property), `FileOut`, `SourceStatus`, `SourceStore`, `Scope`.
+- `client.agents`: `list`, `list_models`, `get`, `create`, `update` (partial, `None` clears
+  `description`/`instructions`/`capabilities`, a capabilities object is merged key by key),
+  `set_models`, `delete`. Reuses `AgentCapabilities` for the wire shape. New public types
+  `AgentOut`, `AgentSummaryOut`, `LLMModelSummaryOut`. Legacy `execution_options` and
+  `memory_namespace` are not exposed: use `capabilities`.
+- `client.skills`: `list`, `create(file, display_name=, scope=)` (a folder is zipped in
+  memory, a `.zip` path or bytes are sent as they are, over 30 MB raises `InvalidParams`),
+  `update`, `upload_version`, `delete`. Multipart uploads go through the API with the token;
+  `AsyncTransport.request` gained `data=`/`files=` for that. New public types `SkillOut`,
+  `SkillFrontmatter`, `SkillSource`.
+- `client.documents.get(document_id)`: resolves a citation's composite document id to its
+  source and file (`DocumentMetadataOut`).
+- `client.mcp.list(enabled=True)`: MCP integrations this key can use (`GET /mcp/manifest`).
+  `enabled=False` keeps only the ones that are off, `enabled=None` returns every server.
+  A server's `name` is the value `McpCapability.connections` stores. New public type
+  `McpServerOut`.
+- Examples `15_sources.py` to `19_mcp_servers.py`.
+
+### Changed
+- `chat.upload_file` shares its bytes-or-path handling with the new resources
+  (`cominty_sdk/_uploads.py`). No behaviour change.
+
 ## [1.1.0] - 2026-10-16
 
 ### Added

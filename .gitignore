@@ -11,3 +11,6 @@ build/
 .coverage
 .coverage.*
 htmlcov/
+
+# Local scratch notebooks (see AGENTS.md section 9.3): never committed.
+notebooks/

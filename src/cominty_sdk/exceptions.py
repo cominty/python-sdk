@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 if TYPE_CHECKING:
     from .models.chat import Message
+    from .models.sources import SourceOut
 
 __all__ = [
     "ComintyError",
@@ -20,6 +21,7 @@ __all__ = [
     "ServerError",
     "APIConnectionError",
     "StreamInterrupted",
+    "SourceSyncFailed",
     "SDKError",
     "InvalidParam",
     "InvalidParams",
@@ -156,6 +158,18 @@ class StreamInterrupted(ComintyError):
     def __init__(self, message: str, *, partial: Message) -> None:
         super().__init__(message)
         self.partial = partial
+
+
+class SourceSyncFailed(ComintyError):
+    """A source stopped in a status other than ``synced`` while being waited on.
+
+    ``source`` is the source as last read: its ``status`` says where it stopped
+    (``error``, ``paused``, ``archived``, ``daily_quota_reached``, ...).
+    """
+
+    def __init__(self, message: str, *, source: SourceOut) -> None:
+        super().__init__(message)
+        self.source = source
 
 
 class SDKError(ComintyError):

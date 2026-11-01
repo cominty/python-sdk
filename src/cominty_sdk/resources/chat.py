@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-import mimetypes
 import os
-from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 from uuid import UUID
 
 from pydantic import TypeAdapter, ValidationError
 
-from cominty_sdk.exceptions import InvalidParam, InvalidParams, SDKError
+from cominty_sdk._uploads import guess_mimetype, invalid_upload, resolve_upload
+from cominty_sdk.exceptions import InvalidParams, SDKError
 from cominty_sdk.models.capabilities import AgentCapabilities, MessageScope
 from cominty_sdk.models.chat import (
     SERVER_DEFAULT,
@@ -33,7 +32,6 @@ if TYPE_CHECKING:
 
 __all__ = ["ChatResource"]
 
-_DEFAULT_MIMETYPE = "application/octet-stream"
 # CONVERSATION_FILE_MAX_SIZE of the hosted API (500 MiB). Checked locally so an oversized
 # file fails before any request; a lower limit on another deployment is still reported
 # by the storage backend.
@@ -266,23 +264,20 @@ class ChatResource:
             APIError: The storage backend or the API refused the upload.
             SDKError: The API answered with an upload permission the SDK cannot use.
         """
-        source, resolved_name = _resolve_upload(file, filename)
+        source, resolved_name = resolve_upload(file, filename, context="chat.upload_file")
         try:
             params = UploadFileParams(
                 filename=resolved_name,
-                mimetype=(
-                    mimetype
-                    if mimetype is not None
-                    else mimetypes.guess_type(resolved_name)[0] or _DEFAULT_MIMETYPE
-                ),
+                mimetype=mimetype if mimetype is not None else guess_mimetype(resolved_name),
             )
         except ValidationError as exc:
             raise InvalidParams.from_validation_error(exc, context="chat.upload_file") from None
         size = len(source) if isinstance(source, bytes) else source.stat().st_size
         if size > _MAX_UPLOAD_BYTES:
-            raise _invalid_upload(
+            raise invalid_upload(
                 "file",
                 f"is {size} bytes, over the {_MAX_UPLOAD_BYTES} bytes (500 MiB) the API accepts",
+                context="chat.upload_file",
             )
         # Read off the event loop: a large file would otherwise freeze every task.
         content = (
@@ -392,31 +387,6 @@ def _live_assistant_message(thread: Thread) -> Message:
         if msg.role == MessageRole.assistant:
             return msg
     raise SDKError("started thread contained no assistant message to stream")
-
-
-def _resolve_upload(source: object, filename: str | None) -> tuple[bytes | Path, str]:
-    # Typed as object on purpose: callers without a type checker can pass anything.
-    if isinstance(source, bytes):
-        if filename is None:
-            raise _invalid_upload("filename", "required when `file` is bytes")
-        return source, filename
-    if isinstance(source, os.PathLike):
-        path = Path(cast("os.PathLike[str]", source))
-        return path, filename if filename is not None else path.name
-    # A str is refused rather than read as a path: upload_file("hello") would otherwise
-    # fail with a baffling FileNotFoundError.
-    hint = ": wrap a path in Path(...)" if isinstance(source, str) else ""
-    raise _invalid_upload(
-        "file", f"expected bytes or a pathlib.Path, got {type(source).__name__}{hint}"
-    )
-
-
-def _invalid_upload(param: str, message: str) -> InvalidParams:
-    # The offending value is left out: it may be a whole file, or a secret passed by mistake.
-    error = InvalidParam(param=param, message=message, input=None)
-    return InvalidParams(
-        f"Invalid parameters for chat.upload_file:\n  - {param}: {message}", errors=[error]
-    )
 
 
 def _as_uuid(message_id: str | UUID) -> UUID:

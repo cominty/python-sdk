@@ -35,9 +35,19 @@ class AsyncTransport:
         *,
         json_body: Any = None,  # noqa: ANN401 - arbitrary JSON request body
         params: Mapping[str, Any] | None = None,
+        data: Mapping[str, Any] | None = None,
+        files: Mapping[str, tuple[str, bytes, str]] | None = None,
     ) -> Any:  # noqa: ANN401 - decoded JSON; resources validate into models
+        # data/files build a multipart body (skills zip uploads); json_body is a JSON one.
         response = await _send(
-            self._client, method, path, action="Request to", json=json_body, params=params
+            self._client,
+            method,
+            path,
+            action="Request to",
+            json=json_body,
+            params=params,
+            data=data,
+            files=files,
         )
         return _safe_json(response)
 

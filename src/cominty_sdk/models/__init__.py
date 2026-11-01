@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .agents import AgentOut, AgentSummaryOut, LLMModelSummaryOut
 from .capabilities import (
     ALL,
     AgentCapabilities,
@@ -38,9 +39,17 @@ from .chat import (
     ThreadInception,
     ThreadSummary,
 )
+from .common import Scope
+from .documents import DocumentMetadataOut
+from .mcp import McpServerOut
 from .memory import MemoryFileCreate, MemoryFileOut, MemoryFileSummaryOut, MemoryFileUpdate
+from .skills import SkillFrontmatter, SkillOut, SkillSource
+from .sources import FileOut, SourceOut, SourceStatus, SourceStore
 
 __all__ = [
+    "AgentOut",
+    "AgentSummaryOut",
+    "LLMModelSummaryOut",
     "ALL",
     "AgentCapabilities",
     "ImageGenerationCapability",
@@ -67,11 +76,21 @@ __all__ = [
     "Message",
     "MessageRole",
     "MessageStatus",
+    "McpServerOut",
     "MemoryFileCreate",
     "MemoryFileOut",
     "MemoryFileSummaryOut",
     "MemoryFileUpdate",
     "Question",
+    "Scope",
+    "FileOut",
+    "SourceOut",
+    "SourceStatus",
+    "SourceStore",
+    "DocumentMetadataOut",
+    "SkillFrontmatter",
+    "SkillOut",
+    "SkillSource",
     "SERVER_DEFAULT",
     "ShareLink",
     "StartChatOptions",

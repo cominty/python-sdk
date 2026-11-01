@@ -17,8 +17,10 @@ from .exceptions import (
     RateLimitError,
     SDKError,
     ServerError,
+    SourceSyncFailed,
     StreamInterrupted,
 )
+from .models.agents import AgentOut, AgentSummaryOut, LLMModelSummaryOut
 from .models.capabilities import (
     ALL,
     AgentCapabilities,
@@ -58,12 +60,17 @@ from .models.chat import (
     ThreadSummary,
     UpdateThreadParams,
 )
+from .models.common import Scope
+from .models.documents import DocumentMetadataOut
+from .models.mcp import McpServerOut
 from .models.memory import (
     MemoryFileCreate,
     MemoryFileOut,
     MemoryFileSummaryOut,
     MemoryFileUpdate,
 )
+from .models.skills import SkillFrontmatter, SkillOut, SkillSource
+from .models.sources import FileOut, SourceOut, SourceStatus, SourceStore
 from .streaming import AssistantRun, StartedChat
 
 try:
@@ -88,10 +95,14 @@ __all__ = [
     "ServerError",
     "APIConnectionError",
     "StreamInterrupted",
+    "SourceSyncFailed",
     "SDKError",
     "InvalidParam",
     "InvalidParams",
     # models
+    "AgentOut",
+    "AgentSummaryOut",
+    "LLMModelSummaryOut",
     "ALL",
     "AgentCapabilities",
     "ImageGenerationCapability",
@@ -127,8 +138,18 @@ __all__ = [
     "ThreadInception",
     "ThreadSummary",
     "UpdateThreadParams",
+    "McpServerOut",
     "MemoryFileCreate",
     "MemoryFileOut",
     "MemoryFileSummaryOut",
     "MemoryFileUpdate",
+    "Scope",
+    "FileOut",
+    "SourceOut",
+    "SourceStatus",
+    "SourceStore",
+    "DocumentMetadataOut",
+    "SkillFrontmatter",
+    "SkillOut",
+    "SkillSource",
 ]

@@ -7,8 +7,13 @@ from typing_extensions import Self
 from ._config import Config
 from ._transport import AsyncTransport
 from .models.chat import validate_user_id
+from .resources.agents import AgentsResource
 from .resources.chat import ChatResource
+from .resources.documents import DocumentsResource
+from .resources.mcp import McpResource
 from .resources.memory import MemoryResource
+from .resources.skills import SkillsResource
+from .resources.sources import SourcesResource
 from .resources.threads import ThreadsResource
 
 __all__ = ["AsyncCominty"]
@@ -63,6 +68,11 @@ class AsyncCominty:
         self.chat = ChatResource(self._transport, user_id=self._config.user_id)
         self.threads = ThreadsResource(self._transport, user_id=self._config.user_id)
         self.memory = MemoryResource(self._transport)
+        self.sources = SourcesResource(self._transport)
+        self.agents = AgentsResource(self._transport)
+        self.skills = SkillsResource(self._transport)
+        self.documents = DocumentsResource(self._transport)
+        self.mcp = McpResource(self._transport)
 
     @property
     def user_id(self) -> str:
