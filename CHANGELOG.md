@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-03
+
 ### Added
 - `client.sources`: local files to an indexed document source in one call.
   `create(files, name=None)` takes a file path, a folder path (its top-level files) or an
@@ -24,9 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `description`/`instructions`/`capabilities`, a capabilities object is merged key by key),
   `set_models`, `delete`. Reuses `AgentCapabilities` for the wire shape. New public types
   `AgentOut`, `AgentSummaryOut`, `LLMModelSummaryOut`. Legacy `execution_options` and
-  `memory_namespace` are not exposed: use `capabilities`.
+  `memory_namespace` are not exposed: use `capabilities`. A capability the SDK cannot parse
+  (one the API adds later, or a newer shape of a known one) is left out of
+  `capabilities` instead of failing the read; sending the agent's capabilities back through
+  `update` keeps it, since the API merges them key by key.
 - `client.skills`: `list`, `create(file, display_name=, scope=)` (a folder is zipped in
-  memory, a `.zip` path or bytes are sent as they are, over 30 MB raises `InvalidParams`),
+  memory without the entries inside it that start with `.`, and may itself live under a dot
+  folder such as `~/.claude/skills`; a `.zip` path or bytes are sent as they are; over 30 MB
+  raises `InvalidParams`),
   `update`, `upload_version`, `delete`. Multipart uploads go through the API with the token;
   `AsyncTransport.request` gained `data=`/`files=` for that. New public types `SkillOut`,
   `SkillFrontmatter`, `SkillSource`.
@@ -260,7 +267,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial async client `AsyncCominty` covering threads, chat, messages
   (send/stream/export/cancel), files (upload/download), usage, and API tokens.
 
-[Unreleased]: https://github.com/cominty/python-sdk/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/cominty/python-sdk/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/cominty/python-sdk/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/cominty/python-sdk/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/cominty/python-sdk/compare/v0.5.0...v1.0.0
 [0.5.0]: https://github.com/cominty/python-sdk/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/cominty/python-sdk/compare/v0.3.0...v0.4.0
